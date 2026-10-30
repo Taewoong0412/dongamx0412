@@ -1,0 +1,153 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>THE CATCHER — 3D 구속 체험</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#07131e;color:#f3f8ff;font:15px system-ui,'Malgun Gothic',sans-serif;overflow:hidden}
+canvas{display:block;width:100vw;height:100vh;cursor:crosshair}
+#gloveSprite{position:fixed;width:clamp(90px,13vw,170px);height:auto;left:50%;top:60%;opacity:.43;pointer-events:none;transform:translate(-50%,-47%);z-index:2;filter:drop-shadow(0 2px 4px #0006)}
+#roundHUD{position:fixed;top:100px;left:50%;transform:translateX(-50%);background:#061e2be8;border:1px solid #60c7d8;padding:10px 17px;border-radius:12px;text-align:center;z-index:3;pointer-events:none}
+#timer{color:#f9c45b;font-size:23px;font-weight:900}#progress{color:#81ffbd;font-weight:800}
+#intro{background:linear-gradient(#04101fc9,#04101fe3),url('catcher_pov_concept.png') center/cover!important}
+#modeButtons{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}.card{max-width:690px!important}
+#modeButtons button{min-width:220px}#endOverlay{position:fixed;inset:0;background:#020d19df;display:none;place-items:center;z-index:9}
+
+#hud{position:fixed;inset:0;pointer-events:none}header{position:absolute;top:15px;left:50%;transform:translateX(-50%);text-align:center;background:#081523dd;border:1px solid #476076;padding:10px 30px;border-radius:14px}
+h1{font-size:24px;letter-spacing:3px;margin:0;color:#fff}small{color:#9db8c9}.panel{position:absolute;top:18px;background:#081523df;border:1px solid #40546c;padding:13px 17px;border-radius:12px;line-height:1.85;min-width:180px}
+#left{left:16px}#right{right:16px}.panel strong{color:#79ddff}.bottom{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:#071622ee;border:1px solid #54718b;border-radius:14px;padding:12px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;pointer-events:auto;max-width:95vw}
+button,select,input{font:inherit}button,select{background:#17334b;color:white;border:1px solid #52758e;padding:9px;border-radius:8px;cursor:pointer}button:hover{background:#28516c}button.active{background:#1e8b9b}input[type=range]{width:120px;accent-color:#42cbe5}
+#message{position:absolute;top:27%;left:50%;transform:translateX(-50%);font-weight:900;font-size:32px;text-shadow:0 2px 8px black;white-space:nowrap;text-align:center}
+#intro{position:fixed;inset:0;display:grid;place-items:center;background:#03101bdc;z-index:5}
+.card{background:#102537;border:1px solid #53748b;border-radius:20px;padding:35px;text-align:center;max-width:580px;box-shadow:0 25px 100px #0008}
+.card h2{font-size:38px;margin:0;color:#80e4ff}.card p{line-height:1.7}.card button{background:#0b8899;font-size:19px;padding:13px 30px}
+#replay{display:none;position:absolute;bottom:92px;left:50%;transform:translateX(-50%);background:#10283ce8;padding:8px 15px;border-radius:10px;pointer-events:auto}
+#replay button{font-size:13px;padding:5px 9px}
+@media(max-width:850px){header{top:4px;padding:5px 10px}h1{font-size:16px}.panel{top:55px;min-width:0;font-size:11px;padding:5px}.bottom{font-size:12px;padding:6px}button,select{padding:5px}#message{font-size:22px}}
+
+/* 포수 마스크 철망: 중앙의 투구 시야를 최대한 보존하는 반투명 금속 프레임 */
+#catcherMask{position:fixed;inset:0;z-index:2;pointer-events:none;display:none;opacity:.38}
+#catcherMask svg{width:100%;height:100%}
+#gloveSprite{z-index:3;width:clamp(88px,9vw,135px)!important;opacity:.40!important;transform:translate(-43%,-35%) rotate(-4deg)!important}
+#roundHUD{z-index:4;top:75px}
+#hud{z-index:4}
+#endOverlay{z-index:20;pointer-events:auto!important}
+#endOverlay .card{pointer-events:auto}
+#endOverlay button{cursor:pointer;position:relative;z-index:21}
+#intro{z-index:15}
+#tutorialToast{position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);background:#06192cf2;border:2px solid #79e6b6;border-radius:18px;padding:28px 40px;font-size:25px;font-weight:800;text-align:center;z-index:18;display:none;pointer-events:none}
+
+#mittTarget{position:fixed;width:15px;height:15px;border:2px solid #a5f8f0;border-radius:50%;
+  box-shadow:0 0 0 2px #07131e80,0 0 12px #b3ffffa0;transform:translate(-50%,-50%);
+  pointer-events:none;z-index:4;display:none}
+
+/* Pre-match setup is the authoritative configuration; in-match HUD is read-only. */
+#intro{overflow:auto;padding:18px;align-items:center}
+#intro .card{width:min(900px,96vw);max-width:900px!important;padding:23px 26px}
+#intro .card h2{font-size:31px}
+#intro .card p{margin:10px 0}
+#preGame{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;text-align:left;margin:15px 0}
+#preGame .setting{background:#061929d9;border:1px solid #40627c;border-radius:11px;padding:10px 13px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+#preGame .setting span{font-weight:700;color:#bde5f8}
+#preGame select{width:min(225px,58%)}
+#preGame input[type=range]{width:min(195px,55%)}
+#preGame .setting.check{justify-content:flex-start;gap:15px}
+#preGame .setting.check label{white-space:nowrap}
+#preGame .setting.full{grid-column:1/-1}
+#intro #modeButtons button{min-width:230px}
+.bottom select,.bottom label{display:none} /* options are selected before game */
+@media(max-width:680px){#preGame{grid-template-columns:1fr}#preGame .setting.full{grid-column:auto}#intro .card{padding:15px}}
+</style><style>#gloveSprite{font-size:86px;line-height:1;text-align:center;height:100px}</style></head><body>
+<canvas id="gl"></canvas>
+<div id="catcherMask" aria-hidden="true"><svg viewBox="0 0 1000 700" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#121a25"/><stop offset=".42" stop-color="#6d7881"/><stop offset=".6" stop-color="#18202b"/><stop offset="1" stop-color="#080e17"/></linearGradient><filter id="edge"><feGaussianBlur stdDeviation="1"/></filter></defs><g fill="none" stroke="#02070d" stroke-width="21" opacity=".76"><path d="M-30 80 Q500 -90 1030 80"/><path d="M-50 590 Q500 790 1050 590"/><path d="M30 -50 Q-90 360 60 760"/><path d="M970 -50 Q1090 360 940 760"/></g><g fill="none" stroke="url(#steel)" stroke-width="9" stroke-linecap="round" opacity=".93"><path d="M-30 80 Q500 -90 1030 80"/><path d="M-50 590 Q500 790 1050 590"/><path d="M30 -50 Q-90 360 60 760"/><path d="M970 -50 Q1090 360 940 760"/><path d="M-20 280 Q500 242 1020 280"/><path d="M-20 490 Q500 526 1020 490"/><path d="M255 -50 Q230 360 255 760"/><path d="M745 -50 Q770 360 745 760"/></g><g fill="none" stroke="#b7c1c9" stroke-width="2" opacity=".45"><path d="M-20 274 Q500 236 1020 274"/><path d="M-20 484 Q500 520 1020 484"/><path d="M249 -50 Q224 360 249 760"/><path d="M739 -50 Q764 360 739 760"/></g></svg></div>
+<div id="mittTarget" aria-hidden="true"></div><div id="gloveSprite" role="img" aria-label="포수 글러브 대체 표시">🧤</div><div id="roundHUD"><div id="stageName">튜토리얼</div><div id="progress">0 / 3 포구</div><div id="timer">제한 시간 없음</div></div><div id="hud"><header><h1>⚾ THE CATCHER</h1><small>CAN YOU CATCH 160 KM/H?</small></header>
+<div class="panel" id="left">구종 <strong id="pitchLabel">직구</strong><br>설정 구속 <strong id="speedLabel">160 km/h</strong><br>릴리스 거리 <strong>16.4 m</strong><br>모드 <strong id="modeLabel">구속 체험</strong></div>
+<div class="panel" id="right">투구 <strong id="count">0</strong><br>포구 성공 <strong id="caught">0</strong><br>포구 실패 <strong id="missed">0</strong><br>최고 구속 <strong id="maxspeed">0</strong><br>첫 반응 <strong id="reaction">—</strong><br>비행 시간 <strong id="flight">—</strong></div>
+<div id="message">투구를 시작하세요</div>
+<div id="replay">리플레이 <button data-rate="1">1×</button><button data-rate=".5">0.5×</button><button data-rate=".25">0.25×</button><button data-rate=".1">0.1×</button><button id="replayStop">닫기</button></div>
+<div class="bottom"><select id="mode"><option value="experience">구속 체험</option><option value="catch">포구 챌린지</option><option value="breaking">변화구 체험</option><option value="pro">프로 투수 챌린지</option><option value="compare">구속 비교 100 ↔ 160</option></select>
+<select id="pitch"><option value="fast">1 직구</option><option value="slider">2 슬라이더</option><option value="curve">3 커브</option><option value="fork">4 포크볼</option><option value="change">5 체인지업</option><option value="two">6 투심</option></select>
+<label>구속 <input id="speed" type="range" min="80" max="170" value="160" step="1"><b id="speedValue">160</b></label>
+<label><input id="slow" type="checkbox"> 연습 0.5배속</label><label><input id="zone" type="checkbox" checked> 존</label><label><input id="blind" type="checkbox"> 블라인드</label>
+<button id="throw">⚾ 투구 시작 (Space)</button><button id="showReplay">리플레이</button><button id="reset">초기화</button></div></div>
+<div id="tutorialToast">튜토리얼 완료!<br><small>본게임이 곧 시작됩니다</small></div><div id="intro"><div class="card"><h2>THE CATCHER</h2><p>포수의 눈으로 100km/h와 160km/h 강속구를 비교해 보세요.<br>실제 3D WebGL 공간에서 공이 날아옵니다.<br><b>마우스 이동</b> 미트 조준 · <b>Space</b> 투구 · <b>1~6</b> 구종<br><b>↑↓</b> 구속 변경 · <b>ESC</b> 일시정지</p><h3 style="margin:13px 0 5px;color:#89e6ff">⚙ 게임 시작 전 설정</h3>
+<div id="preGame">
+<div class="setting"><span>게임 모드</span><select id="preMode"><option value="experience">구속 체험</option><option value="catch">포구 챌린지</option><option value="breaking">변화구 체험</option><option value="pro">프로 투수 챌린지</option><option value="compare">구속 비교 100 ↔ 160</option></select></div>
+<div class="setting"><span>구종</span><select id="prePitch"><option value="fast">1 직구</option><option value="slider">2 슬라이더</option><option value="curve">3 커브</option><option value="fork">4 포크볼</option><option value="change">5 체인지업</option><option value="two">6 투심</option></select></div>
+<div class="setting full"><span>구속 (km/h)</span><input id="preSpeed" type="range" min="80" max="170" step="1" value="150"><strong id="preSpeedValue" style="color:#86e5ff;min-width:67px">150</strong></div>
+<div class="setting check"><label><input id="preSlow" type="checkbox"> 연습 0.5배속</label></div>
+<div class="setting check"><label><input id="preZone" type="checkbox" checked> 스트라이크 존 표시</label></div>
+<div class="setting check"><label><input id="preBlind" type="checkbox"> 블라인드</label></div>
+<div class="setting" style="color:#c0d9e8;font-size:12px">튜토리얼: 3개 포구 → 본게임: 30초 / 10개 포구</div>
+</div>
+<div id="modeButtons"><button id="start">⚾ 게임 시작 — 튜토리얼 → 본게임</button></div><p><small>물리 모델은 교육용 근사치입니다. 모니터 시야각에 따라 체감이 달라집니다.</small></p></div></div>
+<div id="endOverlay"><div class="card"><h2 id="endTitle">결과</h2><p id="endDetail"></p><div id="modeButtons"><button id="retry">🔄 처음부터 다시 시작</button><button id="backMenu">메인 메뉴</button></div></div></div>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id), canvas=$('gl'),gl=canvas.getContext('webgl',{antialias:true,alpha:false});
+if(!gl){$('intro').innerHTML='<div class="card">이 브라우저에서는 WebGL을 사용할 수 없습니다.</div>';return;}
+const vs=`attribute vec3 p;uniform mat4 proj;uniform mat4 view;uniform mat4 model;varying vec3 local;void main(){local=p;gl_Position=proj*view*model*vec4(p,1.);}`;
+const fs=`precision mediump float;uniform vec3 col;uniform float light;uniform float opacity;varying vec3 local;void main(){float v=.74+.26*max(0.,normalize(local+vec3(.1,.4,.2)).y);gl_FragColor=vec4(col*v*light,opacity);}`;
+function shader(type,src){let s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s}
+let program=gl.createProgram();gl.attachShader(program,shader(gl.VERTEX_SHADER,vs));gl.attachShader(program,shader(gl.FRAGMENT_SHADER,fs));gl.linkProgram(program);gl.useProgram(program);
+const ap=gl.getAttribLocation(program,'p'),u={proj:gl.getUniformLocation(program,'proj'),view:gl.getUniformLocation(program,'view'),model:gl.getUniformLocation(program,'model'),col:gl.getUniformLocation(program,'col'),light:gl.getUniformLocation(program,'light'),opacity:gl.getUniformLocation(program,'opacity')};
+function mesh(verts,indices){let b=gl.createBuffer(),i=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STATIC_DRAW);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,i);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indices),gl.STATIC_DRAW);return {b,i,n:indices.length}}
+let cube=mesh([-1,-1,-1,1,-1,-1,1,1,-1,-1,1,-1,-1,-1,1,1,-1,1,1,1,1,-1,1,1],[0,1,2,0,2,3,4,6,5,4,7,6,0,4,5,0,5,1,3,2,6,3,6,7,1,5,6,1,6,2,0,3,7,0,7,4]);
+let sv=[],si=[],lat=12,lon=16;for(let j=0;j<=lat;j++){let a=j*Math.PI/lat;for(let k=0;k<=lon;k++){let b=k*2*Math.PI/lon;sv.push(Math.sin(a)*Math.cos(b),Math.cos(a),Math.sin(a)*Math.sin(b))}}for(let j=0;j<lat;j++)for(let k=0;k<lon;k++){let q=j*(lon+1)+k;si.push(q,q+lon+1,q+1,q+1,q+lon+1,q+lon+2)}let sphere=mesh(sv,si);
+const mat=(x,y,z,sx,sy,sz)=>new Float32Array([sx,0,0,0,0,sy,0,0,0,0,sz,0,x,y,z,1]);
+function draw(m,x,y,z,sx,sy,sz,c,l=1){gl.bindBuffer(gl.ARRAY_BUFFER,m.b);gl.vertexAttribPointer(ap,3,gl.FLOAT,false,0,0);gl.enableVertexAttribArray(ap);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,m.i);gl.uniformMatrix4fv(u.model,false,mat(x,y,z,sx,sy,sz));gl.uniform3fv(u.col,c);gl.uniform1f(u.light,l);gl.uniform1f(u.opacity,draw.opacity||1);gl.drawElements(gl.TRIANGLES,m.n,gl.UNSIGNED_SHORT,0)}
+function perspective(fov,aspect,near,far){let f=1/Math.tan(fov/2),nf=1/(near-far);return new Float32Array([f/aspect,0,0,0,0,f,0,0,0,0,(far+near)*nf,-1,0,0,2*far*near*nf,0])}
+function lookAt(eye,target){let sub=(a,b)=>a.map((v,i)=>v-b[i]),norm=a=>{let d=Math.hypot(...a);return a.map(v=>v/d)},cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];let z=norm(sub(eye,target)),x=norm(cross([0,1,0],z)),y=cross(z,x);return new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-x.reduce((s,v,i)=>s+v*eye[i],0),-y.reduce((s,v,i)=>s+v*eye[i],0),-z.reduce((s,v,i)=>s+v*eye[i],0),1])}
+const C={grass:[.08,.32,.17],dirt:[.45,.27,.14],white:[.94,.95,.92],blue:[.12,.32,.57],skin:[.83,.58,.41],black:[.09,.12,.17],mitt:[.45,.21,.08],yellow:[.98,.75,.15]};
+let pitchTypes={fast:['직구',0,0,0],slider:['슬라이더',-1.6,-.3,0],curve:['커브',-.45,-1.5,0],fork:['포크볼',0,-1.2,0],change:['체인지업',.45,-.5,0],two:['투심',.85,-.4,0]};
+let stage='tutorial',stageCatches=0,stageThrows=0,stageStart=0,stageActive=false,autoNextAt=0,stageEnded=false,stageTransitionAt=0,clockPauseStart=0;let state='idle',count=0,caught=0,missed=0,maxspeed=0,ball=null,last=null,sim=0,charge=0,firstReaction=null,releaseAt=0,mittX=0,mittY=1.08,aimX=0,aimY=1.08,prevPointer=null,pitchAnim=0,replayRate=1,replayT=0,paused=false,compareToggle=false,audio=null;
+function sound(freq,dur,kind='sine'){try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();let o=audio.createOscillator(),g=audio.createGain();o.type=kind;o.frequency.value=freq;g.gain.setValueAtTime(.06,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+dur);o.connect(g).connect(audio.destination);o.start();o.stop(audio.currentTime+dur)}catch(e){}}
+function resize(){let d=Math.min(devicePixelRatio||1,2);canvas.width=innerWidth*d;canvas.height=innerHeight*d;gl.viewport(0,0,canvas.width,canvas.height)}addEventListener('resize',resize);resize();
+function refresh(){let type=$('pitch').value;$('pitchLabel').textContent=pitchTypes[type][0];$('speedLabel').textContent=$('blind').checked&&state==='flight'?'???':$('speed').value+' km/h';$('speedValue').textContent=$('speed').value;$('count').textContent=count;$('caught').textContent=caught;$('missed').textContent=missed;$('maxspeed').textContent=maxspeed+' km/h';$('modeLabel').textContent=$('mode').selectedOptions[0].text}
+function msg(t){$('message').textContent=t}
+function begin(){if(state==='flight'||state==='windup'||state==='replay'||paused||!stageActive||stageEnded)return;let mode=$('mode').value,types=Object.keys(pitchTypes),type=$('pitch').value,speed=+$('speed').value;
+if(mode==='compare'){speed=compareToggle?160:100;compareToggle=!compareToggle;type='fast'}else if(mode==='pro'){speed=140+Math.floor(Math.random()*21);type=types[Math.floor(Math.random()*types.length)]}else if(mode==='breaking'){type=types[1+Math.floor(Math.random()*5)]}
+$('pitch').value=type;$('speed').value=speed;
+let random=mode==='catch'||mode==='pro'||mode==='breaking';
+aimX=random?(Math.random()-.5)*.75:(Math.random()-.5)*.24;aimY=random?.7+Math.random()*.55:.86+Math.random()*.18;
+ball={type,speed,start:[-.27,1.82,16.4],pos:[-.27,1.82,16.4],end:[aimX,aimY,.15],elapsed:0,trace:[],v:speed/3.6,flight:0};state='windup';pitchAnim=0;firstReaction=null;prevPointer=null;msg('투수 와인드업…');refresh()}
+function pathAt(b,t){let v=b.v,drag=.12;let dz=v*(1-Math.exp(-drag*t))/drag;let z=b.start[2]-dz;let f=Math.max(0,Math.min(1,dz/16.25)),breaks=pitchTypes[b.type];let x=b.start[0]+(b.end[0]-b.start[0])*f+breaks[1]*f*f*(1-f*.55)*.5;let y=b.start[1]+(b.end[1]-b.start[1])*f-4.905*t*t+4.905*(16.25/v)**2*f+breaks[2]*f*f*.25;return [x,y,z]}
+function release(){state='flight';stageThrows++;releaseAt=performance.now();sim=0;count++;maxspeed=Math.max(maxspeed,ball.speed);msg('');sound(150,.08,'triangle');refresh()}
+function finish(){let b=ball;state='result';b.flight=b.elapsed;last={...b,trace:b.trace.slice()};let dx=b.pos[0]-mittX,dy=b.pos[1]-mittY,success=Math.hypot(dx,dy)<.24;if(success){caught++;stageCatches++;msg('포구 성공! 🧤');sound(190,.18,'triangle')}else{missed++;msg('포구 실패!');sound(100,.22,'sawtooth')}if(firstReaction!==null)$('reaction').textContent=Math.round(firstReaction)+' ms';else $('reaction').textContent='미측정';$('flight').textContent=(b.elapsed*1000).toFixed(0)+' ms';autoNextAt=performance.now()+240;updateStageHUD();if(stage==='tutorial'&&stageCatches>=3)endStage(true);else if(stage==='main'&&stageCatches>=10)endStage(true);refresh()}
+function pitcher(){let w=state==='windup'?Math.sin(pitchAnim*3)*.18:0;draw(sphere,0,1.8+w,18.44,.17,.19,.17,C.skin);draw(cube,0,1.15+w,18.44,.30,.42,.17,C.blue);draw(cube,-.14,.45,18.44,.115,.35,.12,C.white);draw(cube,.14,.45,18.44,.115,.35,.12,C.white);draw(cube,-.42,1.27+w,18.44,.11,.33,.11,C.skin);draw(cube,.42,1.27+w,18.44,.11,.33,.11,C.skin);draw(sphere,-.42,1.53+w,18.44,.13,.13,.13,C.mitt);draw(cube,0,2.01+w,18.44,.19,.07,.2,C.blue)}
+function world(){draw(cube,0,-.16,18,85,.1,85,C.grass);draw(cube,0,-.035,9.3,2.5,.015,11,C.dirt);draw(cube,0,-.02,18.44,1.3,.08,1.3,C.dirt);draw(cube,0,.012,0,.22,.012,.23,C.white);draw(cube,0,.012,18.44,.30,.02,.07,C.white);
+for(let k=-1;k<=1;k+=2){draw(cube,k*22,2,25,.2,2,45,C.blue);draw(cube,k*5,.04,35,.05,.02,34,C.white)}
+draw(cube,0,2,58,50,2,.25,C.blue);for(let i=-9;i<=9;i++)draw(cube,i*4,5.8,59,1.6,1.2,.1,i%2?C.blue:C.white,.55);
+pitcher();
+if($('zone').checked){let s=[.55,1.04,1.55];for(let x of [-.36,.36])draw(cube,x,1.05,.26,.012,.50,.012,C.yellow,.7);for(let y of [s[0],s[2]])draw(cube,0,y,.26,.36,.012,.012,C.yellow,.7)}
+
+if(ball&&(state==='flight'||state==='result')){let p=ball.pos;draw(sphere,p[0],p[1],p[2],.0365,.0365,.0365,C.white,1.4);draw(sphere,p[0]-.012,p[1],p[2]-.01,.008,.009,.008,[.8,.14,.1])}
+if(state==='replay'&&last){let p=replayPosition(last,replayT);draw(sphere,p[0],p[1],p[2],.0365,.0365,.0365,C.white,1.4);for(let i=0;i<last.trace.length;i+=4){let a=last.trace[i];if(a.t<=replayT)draw(sphere,a.p[0],a.p[1],a.p[2],.015,.015,.015,C.yellow,.9)}}
+}
+function replayPosition(b,t){if(!b.trace.length)return b.start;let prev=b.trace[0];for(let i=1;i<b.trace.length;i++){let q=b.trace[i];if(q.t>=t){let f=(t-prev.t)/Math.max(.00001,q.t-prev.t);return prev.p.map((v,j)=>v+(q.p[j]-v)*f)}prev=q}return prev.p}
+function frame(now){requestAnimationFrame(frame);let dt=Math.min((now-(frame.prev||now))/1000,.25);frame.prev=now;
+if(stageTransitionAt&&now>=stageTransitionAt){stageTransitionAt=0;$('tutorialToast').style.display='none';startStage('main')}if(stageActive&&!stageEnded&&!paused){if(stage==='main'&&now-stageStart>=30000)endStage(stageCatches>=10);else if(state==='result'&&now>autoNextAt)begin();updateStageHUD()}if(!paused){if(state==='windup'){pitchAnim+=dt;if(pitchAnim>=(stage==='tutorial'?.82:.65))release()}else if(state==='flight'){ball.elapsed+=dt*($('slow').checked?.5:1);ball.pos=pathAt(ball,ball.elapsed);ball.trace.push({t:ball.elapsed,p:ball.pos.slice()});if(ball.pos[2]<=-.15){let lo=Math.max(0,ball.elapsed-dt*($('slow').checked?.5:1)),hi=ball.elapsed;for(let k=0;k<18;k++){let mid=(lo+hi)/2;if(pathAt(ball,mid)[2]>-.15)lo=mid;else hi=mid}ball.elapsed=hi;ball.pos=pathAt(ball,hi);finish()}}else if(state==='replay'){replayT+=dt*replayRate;if(replayT>last.flight)replayT=0}}
+gl.clearColor(.035,.10,.17,1);gl.enable(gl.DEPTH_TEST);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+gl.uniformMatrix4fv(u.proj,false,perspective(Math.PI/3,canvas.width/canvas.height,.025,170));
+gl.uniformMatrix4fv(u.view,false,lookAt([0,.69,-.85],[0,.84,18.44]));world()}
+requestAnimationFrame(frame);
+function updateStageHUD(){if(!stageActive)return;$('stageName').textContent=stage==='tutorial'?'🧤 튜토리얼':'⚾ 본게임';$('progress').textContent=stageCatches+' / '+(stage==='tutorial'?3:10)+' 포구';$('timer').textContent=stage==='tutorial'?'제한 시간 없음':Math.max(0,(30-(performance.now()-stageStart)/1000)).toFixed(1)+'초';}
+function applyPregame(){
+$('mode').value=$('preMode').value;$('pitch').value=$('prePitch').value;
+$('speed').value=$('preSpeed').value;$('slow').checked=$('preSlow').checked;
+$('zone').checked=$('preZone').checked;$('blind').checked=$('preBlind').checked;
+refresh();
+}
+function startStage(mode){stageTransitionAt=0;$('tutorialToast').style.display='none';$('catcherMask').style.display='block';$('gloveSprite').style.display='block';$('mittTarget').style.display='block';stage=mode;stageCatches=0;stageThrows=0;stageEnded=false;stageActive=true;stageStart=performance.now();state='idle';ball=null;last=null;paused=false;count=caught=missed=maxspeed=0;firstReaction=null;prevPointer=null;mittX=0;mittY=.84;autoNextAt=0;$('reaction').textContent='—';$('flight').textContent='—';$('intro').style.display='none';$('endOverlay').style.display='none';$('replay').style.display='none';/* tutorial uses a friendly straight pitch, then returns to selected pre-game options */
+if(mode==='tutorial'){$('mode').value='experience';$('pitch').value='fast';$('speed').value=100;$('slow').checked=true;$('blind').checked=false;}
+else{applyPregame();}
+refresh();updateStageHUD();msg(mode==='tutorial'?'공 3개를 받아보세요!':'30초 안에 10개 포구!');begin();}
+function endStage(win){if(stageEnded)return;stageEnded=true;stageActive=false;state='result';if(win&&stage==='tutorial'){stageTransitionAt=performance.now()+1500;$('tutorialToast').style.display='block';msg('튜토리얼 완료!');return;}$('gloveSprite').style.display='none';$('mittTarget').style.display='none';$('catcherMask').style.display='none';$('endTitle').textContent=win?'🎉 성공!':'⏰ GAME OVER';$('endDetail').textContent=(stage==='tutorial'?'튜토리얼':'본게임')+' · 포구 '+stageCatches+'개 / 투구 '+stageThrows+'개'+(win&&stage==='tutorial'?' — 본게임에 도전하세요!':'');$('endOverlay').style.display='grid';}
+$('start').onclick=()=>{applyPregame();startStage('tutorial')};$('retry').onclick=()=>{applyPregame();startStage('tutorial')};$('backMenu').onclick=()=>{$('gloveSprite').style.display='none';$('mittTarget').style.display='none';$('catcherMask').style.display='none';$('endOverlay').style.display='none';$('intro').style.display='grid';stageActive=false;stageEnded=false;stageTransitionAt=0;state='idle';};$('throw').onclick=begin;
+$('preSpeed').oninput=()=>{$('preSpeedValue').textContent=$('preSpeed').value};$('speed').oninput=refresh;$('pitch').onchange=refresh;$('mode').onchange=refresh;$('blind').onchange=refresh;
+$('reset').onclick=()=>{if(stageActive)return;state='idle';ball=null;last=null;count=caught=missed=maxspeed=0;firstReaction=null;$('reaction').textContent='—';$('flight').textContent='—';msg('기록 초기화');$('replay').style.display='none';refresh()};
+$('showReplay').onclick=()=>{if(!last||stageActive)return;state='replay';replayT=0;replayRate=1;$('replay').style.display='block';msg('슬로모션 리플레이')};
+document.querySelectorAll('[data-rate]').forEach(b=>b.onclick=()=>{replayRate=+b.dataset.rate;replayT=0});
+$('replayStop').onclick=()=>{state='result';$('replay').style.display='none';msg('다음 투구를 시작하세요')};
+document.addEventListener('mousemove',e=>{if(!stageActive)return;let r=canvas.getBoundingClientRect(),nx=(e.clientX-r.left)/r.width,ny=(e.clientY-r.top)/r.height;let depth=.70,halfHeight=depth*Math.tan(Math.PI/6),halfWidth=halfHeight*r.width/r.height;let newX=(nx-.5)*2*halfWidth,newY=.84+(.5-ny)*2*halfHeight;if(state==='flight'&&firstReaction===null&&prevPointer&&Math.hypot(newX-prevPointer[0],newY-prevPointer[1])>.025)firstReaction=performance.now()-releaseAt;mittX=Math.max(-1.5,Math.min(1.5,newX));mittY=Math.max(.35,Math.min(1.75,newY));prevPointer=[newX,newY];$('gloveSprite').style.left=e.clientX+'px';$('gloveSprite').style.top=e.clientY+'px';$('mittTarget').style.left=e.clientX+'px';$('mittTarget').style.top=e.clientY+'px';});
+addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();if(e.code==='Space')begin();if(e.code==='Escape'&&stageActive){paused=!paused;if(stage==='main'){if(paused)clockPauseStart=performance.now();else stageStart+=performance.now()-clockPauseStart}msg(paused?'일시정지':'')}if(e.key==='r'||e.key==='R'){mittX=0;mittY=1.08}if('123456'.includes(e.key)){let v=Object.keys(pitchTypes)[+e.key-1];$('pitch').value=v;refresh()}if(e.code==='ArrowUp'||e.code==='ArrowDown'){$('speed').value=Math.max(80,Math.min(170,+$('speed').value+(e.code==='ArrowUp'?1:-1)));refresh()}});
+$('gloveSprite').style.display='none';$('mittTarget').style.display='none';$('catcherMask').style.display='none';refresh();
+})();
+</script></body></html>

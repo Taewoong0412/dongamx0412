@@ -1,0 +1,2318 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>KBO SURVIVAL</title>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#070e15;color:#eef3f7;font-family:'Pretendard',sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none}
+#wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#stage{position:relative;width:960px;height:600px}
+#cv{width:100%;height:100%;display:block;background:#1c3d1f}
+#ctrl{position:absolute;top:8px;right:8px;z-index:5;display:none;gap:4px}
+#ctrl.show{display:flex}
+#ctrl button{padding:6px 10px;font-size:14px;margin:0;background:rgba(20,40,60,.8)}
+#notice{position:absolute;left:8px;bottom:8px;z-index:20;display:none;background:#7a1f1f;padding:6px 10px;border-radius:6px;font-size:12px;max-width:80%}
+.screen{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,12,20,.9);z-index:10;overflow:auto;padding:8px}
+.screen.show{display:flex}
+.panel{background:#132433;border:2px solid #2b4a63;border-radius:14px;padding:18px;width:min(700px,100%);max-height:100%;overflow:auto;box-shadow:0 10px 40px #000a}
+h1{font-size:40px;font-weight:900;color:#ffcf40;text-align:center;letter-spacing:2px;text-shadow:0 3px 0 #7a4b00}
+h2{font-size:20px;margin-bottom:10px;color:#ffcf40}
+p,li{font-size:14px;line-height:1.5}
+button{font-family:inherit;background:#1f4f7a;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;margin:3px}
+button:hover{filter:brightness(1.15)}
+button.gold{background:#c98a00;color:#1a1a1a}
+button.red{background:#9b2c2c}
+button.off{background:#4a5560}
+input,select{background:#0c1a26;color:#fff;border:1px solid #2b4a63;border-radius:6px;padding:7px;font-family:inherit;font-size:14px}
+textarea{width:100%;height:120px;background:#0c1a26;color:#fff;border:1px solid #2b4a63;border-radius:6px;padding:7px;font-family:monospace;font-size:12px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0;justify-content:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;max-height:360px;overflow:auto;margin:8px 0}
+.pcard{background:#0c1a26;border:2px solid #2b4a63;border-radius:10px;padding:8px;cursor:pointer;font-size:12px}
+.pcard.sel{border-color:#ffcf40}
+.pcard .nm{font-size:16px;font-weight:800;display:block;margin-bottom:2px}
+.tag{font-size:10px;background:#7a4b00;padding:1px 5px;border-radius:4px;margin-left:4px}
+.tag.na{background:#6b2020}
+.muted{color:#9fb3c4;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:5px;border-bottom:1px solid #2b4a63;text-align:left}
+.lvcard{background:#0c1a26;border:2px solid #ffcf40;border-radius:10px;padding:12px;margin:6px 0;cursor:pointer}
+.lvcard:hover{background:#17314a}
+</style>
+</head>
+<body>
+<div id="wrap">
+ <div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="ctrl">
+   <button id="bPause" title="일시정지 (ESC)">⏸</button>
+   <button id="bBench" title="벤치 클리어링 (B)">B</button>
+   <button id="bZoomOut">−</button>
+   <button id="bZoomIn">+</button>
+   <button id="bFull">⛶</button>
+  </div>
+  <div id="notice"></div>
+  <div id="fatal" style="display:none;position:absolute;inset:0;z-index:50;background:rgba(18,4,4,.94);padding:24px;overflow:auto"><h2 style="color:#ff8a80">게임 초기화 오류</h2><p style="font-size:13px;margin:8px 0">아래 내용을 확인하거나 다시 시도해 주세요. 상세 내용은 브라우저 콘솔(F12)에도 기록됩니다.</p><pre id="fatalMsg" style="white-space:pre-wrap;font-size:12px;background:#0c1a26;padding:10px;border-radius:6px;max-height:50%;overflow:auto"></pre><button id="fatalRetry" class="gold">다시 시도</button></div>
+
+  <!-- 메인 메뉴 -->
+  <div id="menu" class="screen show">
+   <div class="panel" style="text-align:center">
+    <h1>KBO SURVIVAL</h1>
+    <p class="muted" style="margin:4px 0 12px">야구장 생존 로그라이크 · 현재 내장 선수는 전부 <b>가상 테스트 데이터</b>입니다</p>
+    <div class="row"><button id="modeBat" class="gold">타자 모드</button><button id="modePit" class="off">투수 모드</button></div>
+    <div class="row"><input id="nick" maxlength="10" placeholder="닉네임 (최대 10자)" /></div>
+    <div id="selInfo" class="muted" style="margin:6px 0"></div>
+    <div class="row">
+     <button id="btnStart" class="gold" disabled>게임 시작</button>
+     <button id="btnRandom">랜덤 선택</button>
+     <button id="btnList">선수 목록</button>
+    </div>
+    <div class="row">
+     <button id="btnLb">로컬 랭킹</button>
+     <button id="btnHelp">조작법</button>
+     <button id="btnSettings">설정</button>
+     <button id="btnImport">데이터 가져오기</button>
+    </div>
+   </div>
+  </div>
+
+  <!-- 선수 목록 -->
+  <div id="players" class="screen">
+   <div class="panel">
+    <h2>선수 선택</h2>
+    <div class="row"><input id="search" placeholder="이름 / 팀 / 포지션 검색" style="flex:1" /><button id="pickRandom">랜덤 (해제)</button></div>
+    <div class="muted">현재 모드(<span id="plMode"></span>) 선수만 표시됩니다. 카드를 누르면 선택하고 메뉴로 돌아갑니다.</div>
+    <div id="plGrid" class="grid"></div>
+    <div class="row"><button id="plClose" class="off">닫기</button></div>
+   </div>
+  </div>
+
+  <!-- 로컬 랭킹 -->
+  <div id="lb" class="screen">
+   <div class="panel">
+    <h2>랭킹 (로컬)</h2>
+    <p class="muted">이 기기(브라우저)에만 저장되는 로컬 랭킹입니다. 온라인 전체 랭킹이 아닙니다. 타자/투수 구분 없이 한 목록입니다.</p>
+    <div id="lbBody" style="margin-top:8px"></div>
+    <div class="row"><button id="lbClose" class="off">닫기</button></div>
+   </div>
+  </div>
+
+  <!-- 설정 -->
+  <div id="settings" class="screen">
+   <div class="panel">
+    <h2>설정</h2>
+    <div class="row"><span>사운드</span><button id="setSound"></button></div>
+    <div class="row"><span>음량</span><input id="setVol" type="range" min="0" max="1" step="0.05" /></div>
+    <div class="row"><span>데미지 숫자</span><button id="setDmg"></button></div>
+    <div class="row"><span>화면 배율</span><span id="setZoomLbl"></span></div>
+    <div class="row"><button id="setFull">전체화면 전환</button><button id="setTut">튜토리얼 다시 보기</button></div>
+    <div class="row"><button id="setClear" class="red">기록·업적 초기화</button></div>
+    <div class="row"><button id="setClose" class="off">닫기</button></div>
+   </div>
+  </div>
+
+  <!-- 조작법 -->
+  <div id="help" class="screen">
+   <div class="panel">
+    <h2>조작법</h2>
+    <ul style="margin-left:18px">
+     <li>이동: W A S D / 방향키 (모바일: 화면 왼쪽 절반 드래그)</li>
+     <li>공격: 자동 (사거리 안에 적이 있으면 자동 스윙·투구)</li>
+     <li>벤치 클리어링: B 키 또는 상단 B 버튼 (한 판 최대 3회)</li>
+     <li>일시정지: ESC 키 또는 ⏸ 버튼</li>
+     <li>레벨업 선택: 카드 클릭 또는 1·2·3 키</li>
+    </ul>
+    <h2 style="margin-top:12px">실제 KBO 데이터 넣는 법</h2>
+    <p>'데이터 가져오기' 화면에서 JSON 배열 또는 CSV를 붙여넣으세요. 필수 항목은 타자 <code>avg, hr, ops</code>, 투수 <code>era, avgVelocity, maxVelocity, strikeouts</code>입니다. 빠진 값은 'Data unavailable'로 표시되고 테스트 기본값이 쓰입니다. 실제 기록을 넣을 때는 <code>fictional: false</code>와 <code>source</code>를 꼭 채우세요.</p>
+    <div class="row"><button id="helpClose" class="off">닫기</button></div>
+   </div>
+  </div>
+
+  <!-- 데이터 가져오기 -->
+  <div id="imp" class="screen">
+   <div class="panel">
+    <h2>선수 데이터 가져오기</h2>
+    <p class="muted">JSON 배열 또는 CSV(첫 줄 헤더). 가져온 데이터는 테스트 데이터를 같은 이름 기준으로 덮어씁니다. 잘못된 항목은 건너뜁니다.</p>
+    <input type="file" id="impFile" accept=".json,.csv" style="margin:6px 0" />
+    <textarea id="impText" placeholder='[{"name":"...","mode":"batter","avg":0.300,"hr":25,"ops":0.850,"source":"출처","fictional":false}]'></textarea>
+    <div class="row"><button id="impApply" class="gold">적용</button><button id="impReset" class="red">가져온 데이터 전부 삭제</button><button id="impClose" class="off">닫기</button></div>
+    <div id="impResult" class="muted" style="white-space:pre-wrap"></div>
+   </div>
+  </div>
+
+  <!-- 튜토리얼 -->
+  <div id="tut" class="screen">
+   <div class="panel" style="text-align:center">
+    <h2 id="tutTitle"></h2>
+    <p id="tutBody" style="min-height:70px;margin:12px 0"></p>
+    <div class="muted" id="tutPg"></div>
+    <div class="row">
+     <button id="tutPrev" class="off">이전</button>
+     <button id="tutNext" class="gold">다음</button>
+     <button id="tutSkip" class="off">건너뛰기</button>
+     <button id="tutNever" class="off">다시 보지 않기</button>
+    </div>
+   </div>
+  </div>
+
+  <!-- 일시정지 -->
+  <div id="pause" class="screen">
+   <div class="panel" style="text-align:center">
+    <h2>일시정지</h2>
+    <div id="pauseInfo" class="muted" style="margin:8px 0"></div>
+    <div class="row">
+     <button id="pResume" class="gold">계속하기</button>
+     <button id="pRestart" class="red">다시 시작</button>
+     <button id="pMenu" class="off">메인 메뉴로</button>
+    </div>
+   </div>
+  </div>
+
+  <!-- 레벨업 -->
+  <div id="levelup" class="screen">
+   <div class="panel" style="text-align:center">
+    <h2 id="luTitle">LEVEL UP!</h2>
+    <p class="muted">강화 하나를 고르세요 (1·2·3 키 가능)</p>
+    <div id="luCards"></div>
+   </div>
+  </div>
+
+  <!-- 게임 오버 -->
+  <div id="over" class="screen">
+   <div class="panel" style="text-align:center">
+    <h2>GAME OVER</h2>
+    <div id="overInfo" style="margin:10px 0;line-height:1.8"></div>
+    <div class="row">
+     <button id="oRestart" class="gold">다시 시작</button>
+     <button id="oLb">로컬 랭킹 보기</button>
+     <button id="oMenu" class="off">메인 메뉴</button>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>
+
+<script>
+// ============================================================
+// 오류 기록: 콘솔 + 화면 오류 패널 (빈 화면 방지)
+function showFatal(err){
+  console.error('[KBO SURVIVAL] 오류:', err);
+  const f=document.getElementById('fatal'), m=document.getElementById('fatalMsg');
+  if(m) m.textContent = '오류: ' + ((err && err.message) || String(err)) + '\n\n' + ((err && err.stack) || '');
+  if(f) f.style.display='block';
+}
+window.addEventListener('error', e => showFatal(e.error || e.message));
+window.addEventListener('unhandledrejection', e => showFatal(e.reason));
+// 0. 공통 유틸 / 저장소 / 설정
+// ============================================================
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const rnd = (a,b) => a + Math.random()*(b-a);
+const lerp = (a,b,t) => a + (b-a)*t;
+const num = (v,def) => { const n = (typeof v==='number') ? v : parseFloat(v); return Number.isFinite(n) ? n : def; };
+const dv = (v,f) => (v==null ? 'Data unavailable' : f(v));
+const fmt3 = v => v.toFixed(3).replace(/^0/,'');
+const mmss = s => { s=Math.floor(s); return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); };
+
+const VW=960, VH=600, WW=2000, WH=1400;
+const cv = $('cv'), ctx = cv.getContext('2d');
+const DPR = Math.min(2, window.devicePixelRatio||1);
+cv.width = VW*DPR; cv.height = VH*DPR;
+const stage = $('stage');
+
+function checkStorage(){ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return true; }catch(e){ return false; } }
+const STORE_OK = checkStorage();
+const Store = {
+  get(k,d){ if(!STORE_OK) return d; try{ const v=localStorage.getItem(k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ if(!STORE_OK) return; try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+function notice(t){ const n=$('notice'); n.textContent=t; n.style.display='block'; setTimeout(()=>n.style.display='none', 7000); }
+if(!STORE_OK) notice('브라우저 저장소를 쓸 수 없습니다. 닉네임·기록·설정이 저장되지 않습니다.');
+
+const DEF_SET = {sound:true, volume:0.5, dmgNum:true, zoom:1};
+const Settings = Object.assign({}, DEF_SET, Store.get('kbo_settings', {}));
+const ZOOMS = [0.8,0.9,1,1.1,1.2,1.4,1.6];
+if(!ZOOMS.includes(Settings.zoom)) Settings.zoom = 1;
+function saveSettings(){ Store.set('kbo_settings', Settings); }
+
+// ============================================================
+// 1. 사운드 (WebAudio 합성음 — 외부 음원 없음)
+// ============================================================
+let AC = null;
+function beep(freq=440, dur=0.08, type='square', vol=0.15, slide=0){
+  if(!Settings.sound) return;
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.value = freq;
+    if(slide) o.frequency.linearRampToValueAtTime(Math.max(40, freq+slide), AC.currentTime+dur);
+    const v = Math.max(0.0001, vol*Settings.volume);
+    g.gain.setValueAtTime(v, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime+dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(); o.stop(AC.currentTime+dur);
+  }catch(e){}
+}
+const SFX = {
+  swing:()=>beep(260,0.08,'square',0.12,-120),
+  hit:()=>beep(520,0.05,'triangle',0.12),
+  crit:()=>beep(780,0.14,'square',0.15,200),
+  pitch:()=>beep(330,0.1,'sawtooth',0.10,200),
+  pick:()=>beep(900,0.05,'sine',0.10),
+  up:()=>{ beep(523,0.12,'square',0.15); setTimeout(()=>beep(784,0.18,'square',0.15),120); },
+  boss:()=>beep(120,0.6,'sawtooth',0.2,-60),
+  hurt:()=>beep(150,0.15,'square',0.2,-80),
+  over:()=>beep(220,0.6,'triangle',0.2,-150),
+  bench:()=>beep(440,0.3,'triangle',0.2,220),
+  item:()=>beep(660,0.12,'triangle',0.15,120),
+  double:()=>beep(520,0.12,'square',0.12,260),
+  ult:()=>{ beep(160,0.35,'sawtooth',0.22,-80); setTimeout(()=>beep(640,0.25,'square',0.15,300),150); },
+};
+let lastHitSfx = -1;
+
+// ============================================================
+// 2. 선수 데이터 (전부 가상 테스트 데이터)
+// ============================================================
+const TEST_PLAYERS = [
+  {name:'가상 타자 A(테스트)', team:'테스트팀 A', position:'외야수', mode:'batter', season:0, avg:0.331, hr:34, ops:0.962, sb:22, source:'gameplay test setting', fictional:true},
+  {name:'가상 타자 B(테스트)', team:'테스트팀 B', position:'내야수', mode:'batter', season:0, avg:0.285, hr:18, ops:0.820, sb:5,  source:'gameplay test setting', fictional:true},
+  {name:'가상 타자 C(테스트)', team:'테스트팀 C', position:'포수',   mode:'batter', season:0, avg:0.262, hr:9,  ops:0.710, sb:31, source:'gameplay test setting', fictional:true},
+  {name:'가상 타자 D(테스트)', team:'테스트팀 D', position:'내야수', mode:'batter', season:0, avg:0.301, hr:27, ops:0.889, sb:2,  source:'gameplay test setting', fictional:true},
+  {name:'가상 투수 A(테스트)', team:'테스트팀 A', position:'선발 투수', mode:'pitcher', season:0, era:2.85, innings:170, strikeouts:180, avgVelocity:145, maxVelocity:157, fastballVelocity:153, pitchTypes:{fastball:55,slider:25,curve:10,changeup:10}, source:'gameplay test setting', fictional:true},
+  {name:'가상 투수 B(테스트)', team:'테스트팀 B', position:'구원 투수', mode:'pitcher', season:0, era:3.90, innings:65, strikeouts:70, avgVelocity:147, maxVelocity:154, fastballVelocity:151, pitchTypes:{fastball:40,slider:30,splitter:20,changeup:10}, source:'gameplay test setting', fictional:true},
+  {name:'가상 투수 C(테스트)', team:'테스트팀 C', position:'선발 투수', mode:'pitcher', season:0, era:4.40, innings:150, strikeouts:120, avgVelocity:141, maxVelocity:148, fastballVelocity:146, pitchTypes:{fastball:45,slider:25,curve:15,changeup:15}, source:'gameplay test setting', fictional:true},
+  {name:'가상 투수 D(테스트)', team:'테스트팀 D', position:'마무리 투수', mode:'pitcher', season:0, era:2.10, innings:60, strikeouts:85, avgVelocity:149, maxVelocity:152, fastballVelocity:150, pitchTypes:{fastball:60,slider:30,splitter:10}, source:'gameplay test setting', fictional:true},
+];
+const REQ = { batter:['avg','hr','ops'], pitcher:['avgVelocity','maxVelocity','strikeouts','innings'] };
+
+// 검증 + 정규화: 잘못된 항목은 ok:false로 걸러낸다 (게임이 멈추지 않도록)
+function normalize(raw){
+  try{
+    if(!raw || typeof raw!=='object' || Array.isArray(raw)) return {ok:false, err:'항목이 객체가 아님'};
+    const name = typeof raw.name==='string' ? raw.name.trim() : '';
+    if(!name) return {ok:false, err:'name 누락'};
+    if(raw.mode!=='batter' && raw.mode!=='pitcher') return {ok:false, err:`${name}: mode는 batter 또는 pitcher`};
+    const p = Object.assign({}, raw, {
+      name, team: raw.team||'소속 미상', position: raw.position||'포지션 미상',
+      fictional: raw.fictional===true, source: raw.source||'출처 미기재'
+    });
+    const missing = [];
+    for(const k of REQ[p.mode]){
+      const n = num(raw[k], null);
+      if(n===null) missing.push(k);
+      p[k] = n;
+    }
+    p.sb = num(raw.sb, null);
+    if(p.mode==='pitcher'){
+      let clean = null;
+      if(raw.pitchTypes && typeof raw.pitchTypes==='object'){
+        clean = {};
+        for(const k in raw.pitchTypes){ const n = num(raw.pitchTypes[k], null); if(n!==null && n>=0) clean[k.toLowerCase()] = n; }
+      }
+      if(!clean || !Object.keys(clean).length){ missing.push('pitchTypes'); clean = {fastball:60,slider:20,curve:10,changeup:10}; }
+      p.pitchTypes = clean;
+    }
+    p.missing = missing;
+    p.number = Math.floor(rnd(1,99));
+    return {ok:true, p, warn: missing.length ? `${name}: 누락(${missing.join(', ')}) → 테스트 기본값 사용` : null};
+  }catch(e){ return {ok:false, err:'처리 중 오류: '+e.message}; }
+}
+
+// 실제 기록 데이터 (타자·투수 CSV 병합본, fictional:false). 빠진 값은 Data unavailable로 표시
+const REAL_PLAYERS = [{"name": "고종욱", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.143, "hr": 0, "ops": 0.412}, {"name": "김규성", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.225, "hr": 0, "ops": 0.585}, {"name": "김도영", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.299, "hr": 30, "ops": 1.009}, {"name": "김두현", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2024, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.4, "hr": 0, "ops": 0.9}, {"name": "김선빈", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.26, "hr": 1, "ops": 0.681}, {"name": "김태군", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.257, "hr": 2, "ops": 0.681}, {"name": "김호령", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.274, "hr": 11, "ops": 0.76}, {"name": "나성범", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.295, "hr": 21, "ops": 0.928}, {"name": "박민", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.2, "hr": 3, "ops": 0.561}, {"name": "박정우 (타자)", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.314, "hr": 0, "ops": 0.79}, {"name": "박찬호", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.287, "hr": 5, "ops": 0.722}, {"name": "변우혁", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.203, "hr": 3, "ops": 0.644}, {"name": "서건창", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.136, "hr": 1, "ops": 0.526}, {"name": "소크라테스", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2024, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.31, "hr": 26, "ops": 0.875}, {"name": "오선우", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.241, "hr": 3, "ops": 0.809}, {"name": "윤도현", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.185, "hr": 1, "ops": 0.455}, {"name": "이우성", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.219, "hr": 2, "ops": 0.642}, {"name": "이창진", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.0, "hr": 0, "ops": 0.0}, {"name": "최원준", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.229, "hr": 4, "ops": 0.595}, {"name": "최정용", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.167, "hr": 0, "ops": 0.334}, {"name": "최형우", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.307, "hr": 24, "ops": 0.928}, {"name": "한승택", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.238, "hr": 0, "ops": 0.59}, {"name": "한준수", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.292, "hr": 7, "ops": 0.865}, {"name": "홍종표", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.192, "hr": 0, "ops": 0.475}, {"name": "황대인", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.0, "hr": 0, "ops": 0.0}, {"name": "김기훈 (타자)", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.0, "hr": 0, "ops": 0.0}, {"name": "김석환", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.265, "hr": 2, "ops": 0.71}, {"name": "박재현", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.281, "hr": 13, "ops": 0.774}, {"name": "박헌", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.083, "hr": 0, "ops": 0.297}, {"name": "위즈덤", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.236, "hr": 35, "ops": 0.856}, {"name": "정해원", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2025, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.075, "hr": 0, "ops": 0.271}, {"name": "정현창", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.154, "hr": 0, "ops": 0.449}, {"name": "주효상", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.211, "hr": 0, "ops": 0.461}, {"name": "김민규", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.282, "hr": 0, "ops": 0.736}, {"name": "데일", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.256, "hr": 1, "ops": 0.644}, {"name": "박상준", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.295, "hr": 4, "ops": 0.875}, {"name": "아데를린", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.264, "hr": 10, "ops": 0.862}, {"name": "이호연", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.125, "hr": 0, "ops": 0.388}, {"name": "카스트로", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.332, "hr": 10, "ops": 0.922}, {"name": "하주석", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.333, "hr": 0, "ops": 1.0}, {"name": "한승연", "team": "KIA 타이거즈", "position": "타자 (포지션 미상)", "mode": "batter", "season": 2026, "source": "KBO 기록 (홍나겸 미니프로젝트 수집본, KIA 2024-2026)", "fictional": false, "avg": 0.241, "hr": 1, "ops": 0.768}, {"name": "곽도규", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 137.0, "maxVelocity": 150.0, "fastballAvg": 143.1, "fastballMax": 150.0, "strikeouts": 69, "innings": 61.33, "runAllowedPer9": 5.28, "whip": 1.4, "walks": 40, "hits": 46, "homeRuns": 4, "runs": 36, "battersFaced": 270, "kRate": 0.256, "pitches": 1167, "usage": {"fastball": 63.1, "curveball": 18.1, "cutter": 14.2, "changeup": 4.6}, "velByType": {"changeup": {"n": 54, "avg": 124.9, "max": 129.0}, "curveball": {"n": 211, "avg": 123.8, "max": 133.0}, "cutter": {"n": 166, "avg": 130.6, "max": 136.0}, "fastball": {"n": 736, "avg": 143.1, "max": 150.0}}, "pitchTypes": {"fastball": 77.3, "slider": 0, "curve": 18.1, "changeup": 4.6, "splitter": 0}}, {"name": "김건국", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 137.2, "maxVelocity": 149.0, "fastballAvg": 145.0, "fastballMax": 149.0, "strikeouts": 51, "innings": 82.33, "runAllowedPer9": 7.98, "whip": 1.68, "walks": 31, "hits": 107, "homeRuns": 16, "runs": 73, "battersFaced": 381, "kRate": 0.134, "pitches": 1435, "usage": {"fastball": 37.1, "cutter": 30.0, "splitter": 16.7, "curveball": 15.9, "changeup": 0.3}, "velByType": {"changeup": {"n": 4, "avg": 134.0, "max": 138.0}, "curveball": {"n": 228, "avg": 118.5, "max": 123.0}, "cutter": {"n": 431, "avg": 138.5, "max": 147.0}, "fastball": {"n": 532, "avg": 145.0, "max": 149.0}, "splitter": {"n": 240, "avg": 135.3, "max": 142.0}}, "pitchTypes": {"fastball": 67.1, "slider": 0, "curve": 15.9, "changeup": 0.3, "splitter": 16.7}}, {"name": "김기훈 (투수)", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 134.8, "maxVelocity": 148.0, "fastballAvg": 142.8, "fastballMax": 148.0, "strikeouts": 44, "innings": 49.33, "runAllowedPer9": 5.66, "whip": 1.34, "walks": 25, "hits": 41, "homeRuns": 3, "runs": 31, "battersFaced": 212, "kRate": 0.208, "pitches": 850, "usage": {"fastball": 52.8, "changeup": 28.4, "slider": 18.8}, "velByType": {"changeup": {"n": 241, "avg": 122.6, "max": 129.0}, "fastball": {"n": 449, "avg": 142.8, "max": 148.0}, "slider": {"n": 160, "avg": 130.7, "max": 136.0}}, "pitchTypes": {"fastball": 52.8, "slider": 18.8, "curve": 0, "changeup": 28.4, "splitter": 0}}, {"name": "김대유", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 130.1, "maxVelocity": 141.0, "fastballAvg": 137.0, "fastballMax": 141.0, "strikeouts": 29, "innings": 34.0, "runAllowedPer9": 9.0, "whip": 1.88, "walks": 17, "hits": 47, "homeRuns": 5, "runs": 34, "battersFaced": 165, "kRate": 0.176, "pitches": 605, "usage": {"fastball": 42.1, "slider": 26.1, "changeup": 17.4, "curveball": 14.4}, "velByType": {"changeup": {"n": 105, "avg": 126.4, "max": 131.0}, "curveball": {"n": 87, "avg": 118.3, "max": 124.0}, "fastball": {"n": 255, "avg": 137.0, "max": 141.0}, "slider": {"n": 158, "avg": 127.8, "max": 133.0}}, "pitchTypes": {"fastball": 42.1, "slider": 26.1, "curve": 14.4, "changeup": 17.4, "splitter": 0}}, {"name": "김도현", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 139.0, "maxVelocity": 153.0, "fastballAvg": 146.6, "fastballMax": 153.0, "strikeouts": 130, "innings": 200.0, "runAllowedPer9": 5.36, "whip": 1.5, "walks": 64, "hits": 236, "homeRuns": 20, "runs": 119, "battersFaced": 906, "kRate": 0.143, "pitches": 3398, "usage": {"fastball": 44.7, "curveball": 20.5, "slider": 19.4, "changeup": 15.4}, "velByType": {"changeup": {"n": 524, "avg": 133.4, "max": 146.0}, "curveball": {"n": 695, "avg": 126.8, "max": 135.0}, "fastball": {"n": 1520, "avg": 146.6, "max": 153.0}, "slider": {"n": 659, "avg": 139.0, "max": 145.0}}, "pitchTypes": {"fastball": 44.7, "slider": 19.4, "curve": 20.5, "changeup": 15.4, "splitter": 0}}, {"name": "김민재", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 138.8, "maxVelocity": 148.0, "fastballAvg": 143.4, "fastballMax": 148.0, "strikeouts": 4, "innings": 6.0, "runAllowedPer9": 10.5, "whip": 2.0, "walks": 1, "hits": 11, "homeRuns": 3, "runs": 7, "battersFaced": 30, "kRate": 0.133, "pitches": 106, "usage": {"fastball": 64.2, "splitter": 24.5, "slider": 10.4, "curveball": 0.9}, "velByType": {"curveball": {"n": 1, "avg": 123.0, "max": 123.0}, "fastball": {"n": 68, "avg": 143.4, "max": 148.0}, "slider": {"n": 11, "avg": 130.9, "max": 135.0}, "splitter": {"n": 26, "avg": 131.0, "max": 135.0}}, "pitchTypes": {"fastball": 64.2, "slider": 10.4, "curve": 0.9, "changeup": 0, "splitter": 24.5}}, {"name": "김민주", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 133.6, "maxVelocity": 143.0, "fastballAvg": 140.0, "fastballMax": 143.0, "strikeouts": 4, "innings": 4.0, "runAllowedPer9": 13.5, "whip": 2.5, "walks": 3, "hits": 7, "homeRuns": 0, "runs": 6, "battersFaced": 25, "kRate": 0.16, "pitches": 84, "usage": {"fastball": 54.8, "changeup": 29.8, "curveball": 9.5, "slider": 6.0}, "velByType": {"changeup": {"n": 25, "avg": 126.5, "max": 133.0}, "curveball": {"n": 8, "avg": 122.6, "max": 128.0}, "fastball": {"n": 46, "avg": 140.0, "max": 143.0}, "slider": {"n": 5, "avg": 127.6, "max": 129.0}}, "pitchTypes": {"fastball": 54.8, "slider": 6.0, "curve": 9.5, "changeup": 29.8, "splitter": 0}}, {"name": "김범수", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2026, "seasons": [2026], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 138.8, "maxVelocity": 149.0, "fastballAvg": 146.1, "fastballMax": 149.0, "strikeouts": 32, "innings": 34.0, "runAllowedPer9": 5.29, "whip": 1.94, "walks": 26, "hits": 40, "homeRuns": 2, "runs": 20, "battersFaced": 164, "kRate": 0.195, "pitches": 672, "usage": {"fastball": 44.6, "slider": 31.2, "splitter": 15.3, "curveball": 8.8}, "velByType": {"curveball": {"n": 59, "avg": 115.0, "max": 122.0}, "fastball": {"n": 300, "avg": 146.1, "max": 149.0}, "slider": {"n": 210, "avg": 136.0, "max": 141.0}, "splitter": {"n": 103, "avg": 137.2, "max": 141.0}}, "pitchTypes": {"fastball": 44.6, "slider": 31.2, "curve": 8.8, "changeup": 0, "splitter": 15.3}}, {"name": "김사윤", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2024, "seasons": [2024], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 136.6, "maxVelocity": 146.0, "fastballAvg": 141.2, "fastballMax": 146.0, "strikeouts": 36, "innings": 37.0, "runAllowedPer9": 7.78, "whip": 1.76, "walks": 25, "hits": 40, "homeRuns": 2, "runs": 32, "battersFaced": 173, "kRate": 0.208, "pitches": 727, "usage": {"fastball": 58.5, "slider": 23.5, "changeup": 17.1, "curveball": 1.0}, "velByType": {"changeup": {"n": 124, "avg": 129.0, "max": 134.0}, "curveball": {"n": 7, "avg": 117.7, "max": 122.0}, "fastball": {"n": 425, "avg": 141.2, "max": 146.0}, "slider": {"n": 171, "avg": 131.4, "max": 137.0}}, "pitchTypes": {"fastball": 58.5, "slider": 23.5, "curve": 1.0, "changeup": 17.1, "splitter": 0}}, {"name": "김승현", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2024, "seasons": [2024], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 140.3, "maxVelocity": 150.0, "fastballAvg": 145.7, "fastballMax": 150.0, "strikeouts": 11, "innings": 18.0, "runAllowedPer9": 6.0, "whip": 1.67, "walks": 7, "hits": 23, "homeRuns": 3, "runs": 12, "battersFaced": 85, "kRate": 0.129, "pitches": 289, "usage": {"fastball": 50.2, "slider": 49.1, "splitter": 0.7}, "velByType": {"fastball": {"n": 145, "avg": 145.7, "max": 150.0}, "slider": {"n": 142, "avg": 134.9, "max": 141.0}, "splitter": {"n": 2, "avg": 133.5, "max": 134.0}}, "pitchTypes": {"fastball": 50.2, "slider": 49.1, "curve": 0, "changeup": 0, "splitter": 0.7}}, {"name": "김시훈", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 130.0, "maxVelocity": 144.0, "fastballAvg": 140.3, "fastballMax": 144.0, "strikeouts": 7, "innings": 11.33, "runAllowedPer9": 9.53, "whip": 1.32, "walks": 4, "hits": 11, "homeRuns": 3, "runs": 12, "battersFaced": 43, "kRate": 0.163, "pitches": 172, "usage": {"fastball": 36.0, "splitter": 35.5, "curveball": 22.7, "slider": 5.8}, "velByType": {"curveball": {"n": 39, "avg": 113.9, "max": 120.0}, "fastball": {"n": 62, "avg": 140.3, "max": 144.0}, "slider": {"n": 10, "avg": 126.7, "max": 132.0}, "splitter": {"n": 61, "avg": 130.3, "max": 136.0}}, "pitchTypes": {"fastball": 36.0, "slider": 5.8, "curve": 22.7, "changeup": 0, "splitter": 35.5}}, {"name": "김정엽", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 139.2, "maxVelocity": 148.0, "fastballAvg": 146.7, "fastballMax": 148.0, "strikeouts": 0, "innings": 1.0, "runAllowedPer9": 0.0, "whip": 1.0, "walks": 1, "hits": 0, "homeRuns": 0, "runs": 0, "battersFaced": 5, "kRate": 0.0, "pitches": 21, "usage": {"fastball": 66.7, "curveball": 19.0, "slider": 14.3}, "velByType": {"curveball": {"n": 4, "avg": 121.5, "max": 123.0}, "fastball": {"n": 14, "avg": 146.7, "max": 148.0}, "slider": {"n": 3, "avg": 128.0, "max": 129.0}}, "pitchTypes": {"fastball": 66.7, "slider": 14.3, "curve": 19.0, "changeup": 0, "splitter": 0}}, {"name": "김태형", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 138.9, "maxVelocity": 153.0, "fastballAvg": 147.5, "fastballMax": 153.0, "strikeouts": 14, "innings": 25.33, "runAllowedPer9": 4.97, "whip": 1.26, "walks": 7, "hits": 25, "homeRuns": 4, "runs": 14, "battersFaced": 107, "kRate": 0.131, "pitches": 422, "usage": {"fastball": 55.2, "slider": 23.0, "curveball": 14.7, "splitter": 7.1}, "velByType": {"curveball": {"n": 62, "avg": 121.6, "max": 126.0}, "fastball": {"n": 233, "avg": 147.5, "max": 153.0}, "slider": {"n": 97, "avg": 132.2, "max": 139.0}, "splitter": {"n": 30, "avg": 130.2, "max": 135.0}}, "pitchTypes": {"fastball": 55.2, "slider": 23.0, "curve": 14.7, "changeup": 0, "splitter": 7.1}}, {"name": "김현수", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 135.7, "maxVelocity": 146.0, "fastballAvg": 141.6, "fastballMax": 146.0, "strikeouts": 15, "innings": 24.0, "runAllowedPer9": 7.88, "whip": 1.75, "walks": 18, "hits": 24, "homeRuns": 2, "runs": 21, "battersFaced": 114, "kRate": 0.132, "pitches": 414, "usage": {"fastball": 55.3, "slider": 20.0, "curveball": 16.7, "changeup": 7.5, "splitter": 0.5}, "velByType": {"changeup": {"n": 31, "avg": 128.3, "max": 133.0}, "curveball": {"n": 69, "avg": 122.6, "max": 127.0}, "fastball": {"n": 229, "avg": 141.6, "max": 146.0}, "slider": {"n": 83, "avg": 133.2, "max": 137.0}, "splitter": {"n": 2, "avg": 131.5, "max": 132.0}}, "pitchTypes": {"fastball": 55.3, "slider": 20.0, "curve": 16.7, "changeup": 7.5, "splitter": 0.5}}, {"name": "네일", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 141.3, "maxVelocity": 152.0, "fastballAvg": 147.7, "fastballMax": 152.0, "strikeouts": 290, "innings": 315.67, "runAllowedPer9": 3.16, "whip": 1.16, "walks": 76, "hits": 289, "homeRuns": 17, "runs": 111, "battersFaced": 1306, "kRate": 0.222, "pitches": 4919, "usage": {"fastball": 41.3, "slider": 32.0, "changeup": 15.9, "cutter": 10.1, "curveball": 0.7}, "velByType": {"changeup": {"n": 781, "avg": 139.5, "max": 145.0}, "curveball": {"n": 33, "avg": 123.4, "max": 130.0}, "cutter": {"n": 496, "avg": 142.1, "max": 149.0}, "fastball": {"n": 2034, "avg": 147.7, "max": 152.0}, "slider": {"n": 1575, "avg": 134.2, "max": 140.0}}, "pitchTypes": {"fastball": 51.4, "slider": 32.0, "curve": 0.7, "changeup": 15.9, "splitter": 0}}, {"name": "라우어", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2024, "seasons": [2024], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 140.2, "maxVelocity": 151.0, "fastballAvg": 146.5, "fastballMax": 151.0, "strikeouts": 37, "innings": 34.0, "runAllowedPer9": 4.5, "whip": 1.38, "walks": 12, "hits": 35, "homeRuns": 3, "runs": 17, "battersFaced": 150, "kRate": 0.247, "pitches": 608, "usage": {"fastball": 49.7, "cutter": 23.2, "slider": 13.8, "curveball": 10.7, "changeup": 2.3, "splitter": 0.3}, "velByType": {"changeup": {"n": 14, "avg": 139.6, "max": 141.0}, "curveball": {"n": 65, "avg": 121.9, "max": 125.0}, "cutter": {"n": 141, "avg": 138.2, "max": 145.0}, "fastball": {"n": 302, "avg": 146.5, "max": 151.0}, "slider": {"n": 84, "avg": 135.0, "max": 141.0}, "splitter": {"n": 2, "avg": 137.5, "max": 139.0}}, "pitchTypes": {"fastball": 72.9, "slider": 13.8, "curve": 10.7, "changeup": 2.3, "splitter": 0.3}}, {"name": "박정우 (투수)", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2024, "seasons": [2024], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 129.3, "maxVelocity": 135.0, "fastballAvg": 129.3, "fastballMax": 135.0, "strikeouts": 2, "innings": 1.0, "runAllowedPer9": 0.0, "whip": 0.0, "walks": 0, "hits": 0, "homeRuns": 0, "runs": 0, "battersFaced": 3, "kRate": 0.667, "pitches": 13, "usage": {"fastball": 100.0}, "velByType": {"fastball": {"n": 13, "avg": 129.3, "max": 135.0}}, "pitchTypes": {"fastball": 100.0, "slider": 0, "curve": 0, "changeup": 0, "splitter": 0}}, {"name": "박준표", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2024, "seasons": [2024], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 136.2, "maxVelocity": 143.0, "fastballAvg": 140.5, "fastballMax": 143.0, "strikeouts": 4, "innings": 6.0, "runAllowedPer9": 9.0, "whip": 2.17, "walks": 3, "hits": 10, "homeRuns": 0, "runs": 6, "battersFaced": 29, "kRate": 0.138, "pitches": 88, "usage": {"fastball": 69.3, "curveball": 15.9, "splitter": 14.8}, "velByType": {"curveball": {"n": 14, "avg": 119.1, "max": 121.0}, "fastball": {"n": 61, "avg": 140.5, "max": 143.0}, "splitter": {"n": 13, "avg": 134.5, "max": 136.0}}, "pitchTypes": {"fastball": 69.3, "slider": 0, "curve": 15.9, "changeup": 0, "splitter": 14.8}}, {"name": "성영탁", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 136.8, "maxVelocity": 147.0, "fastballAvg": 143.1, "fastballMax": 147.0, "strikeouts": 30, "innings": 52.0, "runAllowedPer9": 2.94, "whip": 0.98, "walks": 13, "hits": 38, "homeRuns": 2, "runs": 17, "battersFaced": 198, "kRate": 0.152, "pitches": 753, "usage": {"cutter": 42.8, "fastball": 39.8, "curveball": 17.4}, "velByType": {"curveball": {"n": 131, "avg": 125.1, "max": 130.0}, "cutter": {"n": 322, "avg": 135.7, "max": 143.0}, "fastball": {"n": 300, "avg": 143.1, "max": 147.0}}, "pitchTypes": {"fastball": 82.6, "slider": 0, "curve": 17.4, "changeup": 0, "splitter": 0}}, {"name": "스타우트", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2024, "seasons": [2024], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 139.4, "maxVelocity": 149.0, "fastballAvg": 145.6, "fastballMax": 149.0, "strikeouts": 20, "innings": 16.0, "runAllowedPer9": 5.06, "whip": 1.38, "walks": 5, "hits": 17, "homeRuns": 2, "runs": 9, "battersFaced": 73, "kRate": 0.274, "pitches": 327, "usage": {"fastball": 48.9, "slider": 22.3, "cutter": 17.7, "changeup": 11.0}, "velByType": {"changeup": {"n": 36, "avg": 138.9, "max": 142.0}, "cutter": {"n": 58, "avg": 136.9, "max": 141.0}, "fastball": {"n": 160, "avg": 145.6, "max": 149.0}, "slider": {"n": 73, "avg": 127.8, "max": 133.0}}, "pitchTypes": {"fastball": 66.6, "slider": 22.3, "curve": 0, "changeup": 11.0, "splitter": 0}}, {"name": "시라카와", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2026, "seasons": [2026], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 137.0, "maxVelocity": 152.0, "fastballAvg": 146.3, "fastballMax": 152.0, "strikeouts": 28, "innings": 35.0, "runAllowedPer9": 5.4, "whip": 1.63, "walks": 23, "hits": 34, "homeRuns": 4, "runs": 21, "battersFaced": 160, "kRate": 0.175, "pitches": 682, "usage": {"fastball": 44.7, "slider": 20.7, "splitter": 17.6, "curveball": 6.3, "cutter": 6.3, "changeup": 4.4}, "velByType": {"changeup": {"n": 30, "avg": 121.8, "max": 125.0}, "curveball": {"n": 43, "avg": 110.4, "max": 123.0}, "cutter": {"n": 43, "avg": 140.4, "max": 145.0}, "fastball": {"n": 305, "avg": 146.3, "max": 152.0}, "slider": {"n": 141, "avg": 129.3, "max": 136.0}, "splitter": {"n": 120, "avg": 134.5, "max": 140.0}}, "pitchTypes": {"fastball": 51.0, "slider": 20.7, "curve": 6.3, "changeup": 4.4, "splitter": 17.6}}, {"name": "알드레드", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2024, "seasons": [2024], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 135.3, "maxVelocity": 149.0, "fastballAvg": 141.9, "fastballMax": 149.0, "strikeouts": 52, "innings": 44.0, "runAllowedPer9": 3.48, "whip": 1.25, "walks": 17, "hits": 38, "homeRuns": 4, "runs": 17, "battersFaced": 184, "kRate": 0.283, "pitches": 748, "usage": {"fastball": 54.9, "slider": 35.8, "changeup": 8.6, "cutter": 0.7}, "velByType": {"changeup": {"n": 64, "avg": 127.6, "max": 133.0}, "cutter": {"n": 5, "avg": 137.2, "max": 140.0}, "fastball": {"n": 411, "avg": 141.9, "max": 149.0}, "slider": {"n": 268, "avg": 126.9, "max": 132.0}}, "pitchTypes": {"fastball": 55.6, "slider": 35.8, "curve": 0, "changeup": 8.6, "splitter": 0}}, {"name": "양현종", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 133.8, "maxVelocity": 148.0, "fastballAvg": 140.2, "fastballMax": 148.0, "strikeouts": 238, "innings": 324.0, "runAllowedPer9": 4.78, "whip": 1.37, "walks": 98, "hits": 345, "homeRuns": 33, "runs": 172, "battersFaced": 1404, "kRate": 0.17, "pitches": 5117, "usage": {"fastball": 48.1, "changeup": 27.7, "slider": 20.3, "curveball": 3.9}, "velByType": {"changeup": {"n": 1417, "avg": 128.5, "max": 137.0}, "curveball": {"n": 198, "avg": 116.3, "max": 122.0}, "fastball": {"n": 2463, "avg": 140.2, "max": 148.0}, "slider": {"n": 1039, "avg": 129.2, "max": 139.0}}, "pitchTypes": {"fastball": 48.1, "slider": 20.3, "curve": 3.9, "changeup": 27.7, "splitter": 0}}, {"name": "올러", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 142.9, "maxVelocity": 157.0, "fastballAvg": 149.9, "fastballMax": 157.0, "strikeouts": 169, "innings": 150.33, "runAllowedPer9": 3.65, "whip": 1.14, "walks": 47, "hits": 125, "homeRuns": 8, "runs": 61, "battersFaced": 620, "kRate": 0.273, "pitches": 2490, "usage": {"fastball": 49.2, "slider": 31.7, "changeup": 12.4, "curveball": 6.4, "cutter": 0.2}, "velByType": {"changeup": {"n": 310, "avg": 139.8, "max": 145.0}, "curveball": {"n": 160, "avg": 129.0, "max": 140.0}, "cutter": {"n": 5, "avg": 142.8, "max": 144.0}, "fastball": {"n": 1225, "avg": 149.9, "max": 157.0}, "slider": {"n": 790, "avg": 136.0, "max": 143.0}}, "pitchTypes": {"fastball": 49.4, "slider": 31.7, "curve": 6.4, "changeup": 12.4, "splitter": 0}}, {"name": "유승철", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 140.2, "maxVelocity": 150.0, "fastballAvg": 143.7, "fastballMax": 150.0, "strikeouts": 7, "innings": 7.0, "runAllowedPer9": 2.57, "whip": 2.14, "walks": 9, "hits": 6, "homeRuns": 0, "runs": 2, "battersFaced": 34, "kRate": 0.206, "pitches": 142, "usage": {"fastball": 69.7, "slider": 21.1, "curveball": 9.2}, "velByType": {"curveball": {"n": 13, "avg": 129.4, "max": 134.0}, "fastball": {"n": 99, "avg": 143.7, "max": 150.0}, "slider": {"n": 30, "avg": 133.3, "max": 137.0}}, "pitchTypes": {"fastball": 69.7, "slider": 21.1, "curve": 9.2, "changeup": 0, "splitter": 0}}, {"name": "유지성", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 136.7, "maxVelocity": 145.0, "fastballAvg": 141.5, "fastballMax": 145.0, "strikeouts": 3, "innings": 4.0, "runAllowedPer9": 4.5, "whip": 1.25, "walks": 0, "hits": 5, "homeRuns": 1, "runs": 2, "battersFaced": 17, "kRate": 0.176, "pitches": 61, "usage": {"fastball": 60.7, "slider": 21.3, "changeup": 16.4, "curveball": 1.6}, "velByType": {"changeup": {"n": 10, "avg": 133.5, "max": 138.0}, "curveball": {"n": 1, "avg": 116.0, "max": 116.0}, "fastball": {"n": 37, "avg": 141.5, "max": 145.0}, "slider": {"n": 13, "avg": 127.0, "max": 132.0}}, "pitchTypes": {"fastball": 60.7, "slider": 21.3, "curve": 1.6, "changeup": 16.4, "splitter": 0}}, {"name": "윤영철", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 130.8, "maxVelocity": 145.0, "fastballAvg": 138.0, "fastballMax": 145.0, "strikeouts": 101, "innings": 131.0, "runAllowedPer9": 4.81, "whip": 1.58, "walks": 73, "hits": 134, "homeRuns": 12, "runs": 70, "battersFaced": 589, "kRate": 0.171, "pitches": 2332, "usage": {"fastball": 35.7, "slider": 22.0, "cutter": 18.3, "changeup": 16.9, "curveball": 7.0}, "velByType": {"changeup": {"n": 395, "avg": 127.4, "max": 135.0}, "curveball": {"n": 164, "avg": 117.6, "max": 122.0}, "cutter": {"n": 427, "avg": 132.5, "max": 138.0}, "fastball": {"n": 833, "avg": 138.0, "max": 145.0}, "slider": {"n": 513, "avg": 124.8, "max": 131.0}}, "pitchTypes": {"fastball": 54.0, "slider": 22.0, "curve": 7.0, "changeup": 16.9, "splitter": 0}}, {"name": "윤중현", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 133.9, "maxVelocity": 145.0, "fastballAvg": 140.3, "fastballMax": 145.0, "strikeouts": 11, "innings": 22.0, "runAllowedPer9": 11.05, "whip": 2.18, "walks": 16, "hits": 32, "homeRuns": 6, "runs": 27, "battersFaced": 110, "kRate": 0.1, "pitches": 398, "usage": {"fastball": 54.0, "curveball": 16.8, "changeup": 11.1, "slider": 10.1, "splitter": 8.0}, "velByType": {"changeup": {"n": 44, "avg": 128.1, "max": 133.0}, "curveball": {"n": 67, "avg": 122.7, "max": 127.0}, "fastball": {"n": 215, "avg": 140.3, "max": 145.0}, "slider": {"n": 40, "avg": 123.0, "max": 128.0}, "splitter": {"n": 32, "avg": 135.2, "max": 138.0}}, "pitchTypes": {"fastball": 54.0, "slider": 10.1, "curve": 16.8, "changeup": 11.1, "splitter": 8.0}}, {"name": "이도현", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 137.8, "maxVelocity": 147.0, "fastballAvg": 143.0, "fastballMax": 147.0, "strikeouts": 9, "innings": 13.0, "runAllowedPer9": 6.92, "whip": 1.92, "walks": 8, "hits": 17, "homeRuns": 1, "runs": 10, "battersFaced": 65, "kRate": 0.138, "pitches": 242, "usage": {"fastball": 57.0, "changeup": 38.8, "curveball": 4.1}, "velByType": {"changeup": {"n": 94, "avg": 131.8, "max": 136.0}, "curveball": {"n": 10, "avg": 122.0, "max": 125.0}, "fastball": {"n": 138, "avg": 143.0, "max": 147.0}}, "pitchTypes": {"fastball": 57.0, "slider": 0, "curve": 4.1, "changeup": 38.8, "splitter": 0}}, {"name": "이성원", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 142.4, "maxVelocity": 150.0, "fastballAvg": 146.7, "fastballMax": 150.0, "strikeouts": 3, "innings": 4.33, "runAllowedPer9": 8.31, "whip": 1.62, "walks": 4, "hits": 3, "homeRuns": 0, "runs": 4, "battersFaced": 19, "kRate": 0.158, "pitches": 71, "usage": {"fastball": 70.4, "splitter": 21.1, "slider": 8.5}, "velByType": {"fastball": {"n": 50, "avg": 146.7, "max": 150.0}, "slider": {"n": 6, "avg": 129.5, "max": 132.0}, "splitter": {"n": 15, "avg": 132.9, "max": 136.0}}, "pitchTypes": {"fastball": 70.4, "slider": 8.5, "curve": 0, "changeup": 0, "splitter": 21.1}}, {"name": "이의리", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 138.9, "maxVelocity": 153.0, "fastballAvg": 147.3, "fastballMax": 153.0, "strikeouts": 56, "innings": 53.0, "runAllowedPer9": 7.13, "whip": 1.94, "walks": 45, "hits": 58, "homeRuns": 9, "runs": 42, "battersFaced": 262, "kRate": 0.214, "pitches": 1072, "usage": {"fastball": 48.5, "slider": 23.6, "changeup": 16.0, "curveball": 11.9}, "velByType": {"changeup": {"n": 171, "avg": 132.3, "max": 138.0}, "curveball": {"n": 128, "avg": 123.1, "max": 131.0}, "fastball": {"n": 520, "avg": 147.3, "max": 153.0}, "slider": {"n": 253, "avg": 134.2, "max": 141.0}}, "pitchTypes": {"fastball": 48.5, "slider": 23.6, "curve": 11.9, "changeup": 16.0, "splitter": 0}}, {"name": "이준영", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 133.9, "maxVelocity": 146.0, "fastballAvg": 141.5, "fastballMax": 146.0, "strikeouts": 67, "innings": 70.33, "runAllowedPer9": 6.53, "whip": 1.44, "walks": 28, "hits": 73, "homeRuns": 11, "runs": 51, "battersFaced": 305, "kRate": 0.22, "pitches": 1191, "usage": {"slider": 70.4, "fastball": 27.5, "changeup": 0.8, "curveball": 0.7, "splitter": 0.6}, "velByType": {"changeup": {"n": 10, "avg": 134.5, "max": 137.0}, "curveball": {"n": 8, "avg": 118.1, "max": 121.0}, "fastball": {"n": 327, "avg": 141.5, "max": 146.0}, "slider": {"n": 839, "avg": 131.0, "max": 137.0}, "splitter": {"n": 7, "avg": 134.3, "max": 136.0}}, "pitchTypes": {"fastball": 27.5, "slider": 70.4, "curve": 0.7, "changeup": 0.8, "splitter": 0.6}}, {"name": "이태양", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2026, "seasons": [2026], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 133.8, "maxVelocity": 147.0, "fastballAvg": 142.7, "fastballMax": 147.0, "strikeouts": 11, "innings": 18.0, "runAllowedPer9": 3.0, "whip": 1.11, "walks": 5, "hits": 15, "homeRuns": 2, "runs": 6, "battersFaced": 74, "kRate": 0.149, "pitches": 308, "usage": {"fastball": 44.5, "slider": 24.7, "splitter": 24.7, "curveball": 6.2}, "velByType": {"curveball": {"n": 19, "avg": 113.8, "max": 116.0}, "fastball": {"n": 137, "avg": 142.7, "max": 147.0}, "slider": {"n": 76, "avg": 129.3, "max": 133.0}, "splitter": {"n": 76, "avg": 127.5, "max": 132.0}}, "pitchTypes": {"fastball": 44.5, "slider": 24.7, "curve": 6.2, "changeup": 0, "splitter": 24.7}}, {"name": "이형범", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 137.0, "maxVelocity": 150.0, "fastballAvg": 142.4, "fastballMax": 150.0, "strikeouts": 15, "innings": 25.0, "runAllowedPer9": 12.24, "whip": 2.36, "walks": 12, "hits": 47, "homeRuns": 2, "runs": 34, "battersFaced": 139, "kRate": 0.108, "pitches": 505, "usage": {"fastball": 53.9, "slider": 37.6, "changeup": 5.9, "curveball": 2.2, "splitter": 0.4}, "velByType": {"changeup": {"n": 30, "avg": 128.4, "max": 130.0}, "curveball": {"n": 11, "avg": 123.2, "max": 129.0}, "fastball": {"n": 272, "avg": 142.4, "max": 150.0}, "slider": {"n": 190, "avg": 131.5, "max": 138.0}, "splitter": {"n": 2, "avg": 129.5, "max": 130.0}}, "pitchTypes": {"fastball": 53.9, "slider": 37.6, "curve": 2.2, "changeup": 5.9, "splitter": 0.4}}, {"name": "이호민", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 132.6, "maxVelocity": 143.0, "fastballAvg": 139.2, "fastballMax": 143.0, "strikeouts": 7, "innings": 16.33, "runAllowedPer9": 11.57, "whip": 1.84, "walks": 9, "hits": 21, "homeRuns": 0, "runs": 21, "battersFaced": 72, "kRate": 0.097, "pitches": 259, "usage": {"fastball": 52.5, "slider": 20.1, "changeup": 14.7, "curveball": 12.7}, "velByType": {"changeup": {"n": 38, "avg": 129.6, "max": 135.0}, "curveball": {"n": 33, "avg": 120.4, "max": 123.0}, "fastball": {"n": 136, "avg": 139.2, "max": 143.0}, "slider": {"n": 52, "avg": 125.5, "max": 130.0}}, "pitchTypes": {"fastball": 52.5, "slider": 20.1, "curve": 12.7, "changeup": 14.7, "splitter": 0}}, {"name": "임기영", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 128.8, "maxVelocity": 142.0, "fastballAvg": 134.8, "fastballMax": 142.0, "strikeouts": 41, "innings": 56.33, "runAllowedPer9": 8.63, "whip": 1.86, "walks": 21, "hits": 84, "homeRuns": 10, "runs": 54, "battersFaced": 270, "kRate": 0.152, "pitches": 1042, "usage": {"fastball": 39.3, "changeup": 36.3, "slider": 23.3, "curveball": 1.1}, "velByType": {"changeup": {"n": 378, "avg": 123.2, "max": 130.0}, "curveball": {"n": 11, "avg": 122.5, "max": 125.0}, "fastball": {"n": 410, "avg": 134.8, "max": 142.0}, "slider": {"n": 243, "avg": 127.6, "max": 133.0}}, "pitchTypes": {"fastball": 39.3, "slider": 23.3, "curve": 1.1, "changeup": 36.3, "splitter": 0}}, {"name": "장재혁", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 139.7, "maxVelocity": 147.0, "fastballAvg": 144.9, "fastballMax": 147.0, "strikeouts": 2, "innings": 5.0, "runAllowedPer9": 3.6, "whip": 1.8, "walks": 4, "hits": 5, "homeRuns": 1, "runs": 2, "battersFaced": 20, "kRate": 0.1, "pitches": 90, "usage": {"fastball": 63.3, "slider": 33.3, "splitter": 3.3}, "velByType": {"fastball": {"n": 57, "avg": 144.9, "max": 147.0}, "slider": {"n": 30, "avg": 130.6, "max": 135.0}, "splitter": {"n": 3, "avg": 130.7, "max": 132.0}}, "pitchTypes": {"fastball": 63.3, "slider": 33.3, "curve": 0, "changeup": 0, "splitter": 3.3}}, {"name": "장현식", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2024, "seasons": [2024], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 142.5, "maxVelocity": 152.0, "fastballAvg": 148.3, "fastballMax": 152.0, "strikeouts": 75, "innings": 75.0, "runAllowedPer9": 3.96, "whip": 1.45, "walks": 34, "hits": 75, "homeRuns": 8, "runs": 33, "battersFaced": 331, "kRate": 0.227, "pitches": 1289, "usage": {"fastball": 46.0, "slider": 33.6, "splitter": 20.4}, "velByType": {"fastball": {"n": 593, "avg": 148.3, "max": 152.0}, "slider": {"n": 433, "avg": 134.9, "max": 143.0}, "splitter": {"n": 263, "avg": 141.8, "max": 148.0}}, "pitchTypes": {"fastball": 46.0, "slider": 33.6, "curve": 0, "changeup": 0, "splitter": 20.4}}, {"name": "전상현", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 138.5, "maxVelocity": 149.0, "fastballAvg": 143.9, "fastballMax": 149.0, "strikeouts": 104, "innings": 136.0, "runAllowedPer9": 4.3, "whip": 1.17, "walks": 40, "hits": 119, "homeRuns": 9, "runs": 65, "battersFaced": 562, "kRate": 0.185, "pitches": 2136, "usage": {"fastball": 45.2, "slider": 28.9, "splitter": 18.9, "curveball": 7.0}, "velByType": {"curveball": {"n": 150, "avg": 125.1, "max": 131.0}, "fastball": {"n": 965, "avg": 143.9, "max": 149.0}, "slider": {"n": 618, "avg": 135.8, "max": 141.0}, "splitter": {"n": 403, "avg": 134.3, "max": 139.0}}, "pitchTypes": {"fastball": 45.2, "slider": 28.9, "curve": 7.0, "changeup": 0, "splitter": 18.9}}, {"name": "정해영", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 141.2, "maxVelocity": 153.0, "fastballAvg": 146.7, "fastballMax": 153.0, "strikeouts": 121, "innings": 115.67, "runAllowedPer9": 3.97, "whip": 1.34, "walks": 33, "hits": 122, "homeRuns": 12, "runs": 51, "battersFaced": 483, "kRate": 0.251, "pitches": 1951, "usage": {"fastball": 56.4, "slider": 29.1, "splitter": 13.8, "cutter": 0.5, "curveball": 0.2}, "velByType": {"curveball": {"n": 4, "avg": 121.8, "max": 127.0}, "cutter": {"n": 10, "avg": 139.1, "max": 144.0}, "fastball": {"n": 1100, "avg": 146.7, "max": 153.0}, "slider": {"n": 568, "avg": 134.2, "max": 143.0}, "splitter": {"n": 269, "avg": 133.4, "max": 143.0}}, "pitchTypes": {"fastball": 56.9, "slider": 29.1, "curve": 0.2, "changeup": 0, "splitter": 13.8}}, {"name": "조상우", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 139.2, "maxVelocity": 151.0, "fastballAvg": 145.1, "fastballMax": 151.0, "strikeouts": 55, "innings": 60.0, "runAllowedPer9": 4.2, "whip": 1.52, "walks": 27, "hits": 64, "homeRuns": 5, "runs": 28, "battersFaced": 271, "kRate": 0.203, "pitches": 1113, "usage": {"fastball": 57.7, "slider": 32.2, "splitter": 10.2}, "velByType": {"fastball": {"n": 642, "avg": 145.1, "max": 151.0}, "slider": {"n": 358, "avg": 129.3, "max": 136.0}, "splitter": {"n": 113, "avg": 137.6, "max": 142.0}}, "pitchTypes": {"fastball": 57.7, "slider": 32.2, "curve": 0, "changeup": 0, "splitter": 10.2}}, {"name": "지현", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2026, "seasons": [2026], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 135.8, "maxVelocity": 145.0, "fastballAvg": 141.1, "fastballMax": 145.0, "strikeouts": 1, "innings": 4.0, "runAllowedPer9": 9.0, "whip": 2.25, "walks": 3, "hits": 6, "homeRuns": 2, "runs": 4, "battersFaced": 21, "kRate": 0.048, "pitches": 82, "usage": {"fastball": 56.1, "slider": 35.4, "splitter": 8.5}, "velByType": {"fastball": {"n": 46, "avg": 141.1, "max": 145.0}, "slider": {"n": 29, "avg": 128.2, "max": 130.0}, "splitter": {"n": 7, "avg": 133.1, "max": 136.0}}, "pitchTypes": {"fastball": 56.1, "slider": 35.4, "curve": 0, "changeup": 0, "splitter": 8.5}}, {"name": "최지민", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 141.3, "maxVelocity": 151.0, "fastballAvg": 145.6, "fastballMax": 151.0, "strikeouts": 76, "innings": 99.0, "runAllowedPer9": 6.09, "whip": 1.83, "walks": 91, "hits": 90, "homeRuns": 7, "runs": 67, "battersFaced": 478, "kRate": 0.159, "pitches": 1957, "usage": {"fastball": 64.7, "slider": 25.1, "changeup": 10.1}, "velByType": {"changeup": {"n": 198, "avg": 134.8, "max": 141.0}, "fastball": {"n": 1267, "avg": 145.6, "max": 151.0}, "slider": {"n": 492, "avg": 132.6, "max": 138.0}}, "pitchTypes": {"fastball": 64.7, "slider": 25.1, "curve": 0, "changeup": 10.1, "splitter": 0}}, {"name": "크로우", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2024, "seasons": [2024], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 141.7, "maxVelocity": 153.0, "fastballAvg": 148.7, "fastballMax": 153.0, "strikeouts": 43, "innings": 41.0, "runAllowedPer9": 3.73, "whip": 1.29, "walks": 12, "hits": 41, "homeRuns": 2, "runs": 17, "battersFaced": 172, "kRate": 0.25, "pitches": 710, "usage": {"fastball": 43.5, "slider": 32.1, "changeup": 17.3, "cutter": 3.8, "curveball": 3.2}, "velByType": {"changeup": {"n": 123, "avg": 135.0, "max": 141.0}, "curveball": {"n": 23, "avg": 130.0, "max": 133.0}, "cutter": {"n": 27, "avg": 139.6, "max": 143.0}, "fastball": {"n": 309, "avg": 148.7, "max": 153.0}, "slider": {"n": 228, "avg": 137.2, "max": 142.0}}, "pitchTypes": {"fastball": 47.3, "slider": 32.1, "curve": 3.2, "changeup": 17.3, "splitter": 0}}, {"name": "한재승", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 141.3, "maxVelocity": 150.0, "fastballAvg": 147.4, "fastballMax": 150.0, "strikeouts": 17, "innings": 15.0, "runAllowedPer9": 13.8, "whip": 2.2, "walks": 12, "hits": 21, "homeRuns": 4, "runs": 23, "battersFaced": 74, "kRate": 0.23, "pitches": 321, "usage": {"fastball": 60.7, "slider": 29.3, "splitter": 9.7, "curveball": 0.3}, "velByType": {"curveball": {"n": 1, "avg": 114.0, "max": 114.0}, "fastball": {"n": 195, "avg": 147.4, "max": 150.0}, "slider": {"n": 94, "avg": 131.7, "max": 138.0}, "splitter": {"n": 31, "avg": 133.2, "max": 137.0}}, "pitchTypes": {"fastball": 60.7, "slider": 29.3, "curve": 0.3, "changeup": 0, "splitter": 9.7}}, {"name": "홍건희", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2026, "seasons": [2026], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 139.5, "maxVelocity": 147.0, "fastballAvg": 143.0, "fastballMax": 147.0, "strikeouts": 2, "innings": 3.0, "runAllowedPer9": 3.0, "whip": 1.33, "walks": 0, "hits": 4, "homeRuns": 0, "runs": 1, "battersFaced": 14, "kRate": 0.143, "pitches": 61, "usage": {"fastball": 65.6, "slider": 34.4}, "velByType": {"fastball": {"n": 40, "avg": 143.0, "max": 147.0}, "slider": {"n": 21, "avg": 132.7, "max": 136.0}}, "pitchTypes": {"fastball": 65.6, "slider": 34.4, "curve": 0, "changeup": 0, "splitter": 0}}, {"name": "홍민규", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2026, "seasons": [2026], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 135.0, "maxVelocity": 148.0, "fastballAvg": 143.1, "fastballMax": 148.0, "strikeouts": 16, "innings": 19.0, "runAllowedPer9": 8.53, "whip": 1.79, "walks": 7, "hits": 27, "homeRuns": 2, "runs": 18, "battersFaced": 89, "kRate": 0.18, "pitches": 312, "usage": {"fastball": 42.9, "changeup": 41.0, "slider": 12.8, "curveball": 3.2}, "velByType": {"changeup": {"n": 128, "avg": 127.9, "max": 133.0}, "curveball": {"n": 10, "avg": 121.8, "max": 125.0}, "fastball": {"n": 134, "avg": 143.1, "max": 148.0}, "slider": {"n": 40, "avg": 133.5, "max": 138.0}}, "pitchTypes": {"fastball": 42.9, "slider": 12.8, "curve": 3.2, "changeup": 41.0, "splitter": 0}}, {"name": "홍원빈", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 147.4, "maxVelocity": 154.0, "fastballAvg": 149.4, "fastballMax": 154.0, "strikeouts": 1, "innings": 3.33, "runAllowedPer9": 5.4, "whip": 1.8, "walks": 4, "hits": 2, "homeRuns": 0, "runs": 2, "battersFaced": 11, "kRate": 0.091, "pitches": 36, "usage": {"fastball": 83.3, "slider": 16.7}, "velByType": {"fastball": {"n": 30, "avg": 149.4, "max": 154.0}, "slider": {"n": 6, "avg": 137.2, "max": 141.0}}, "pitchTypes": {"fastball": 83.3, "slider": 16.7, "curve": 0, "changeup": 0, "splitter": 0}}, {"name": "황동하", "team": "KIA 타이거즈", "position": "투수 (보직 미상)", "mode": "pitcher", "season": 2025, "seasons": [2024, 2025], "source": "KIA_pitcher_2024_2026.csv 투구 원자료 집계 + kia_pitcher_stats_2024_2026.csv (2024-2025 우선)", "fictional": false, "era": null, "avgVelocity": 133.9, "maxVelocity": 149.0, "fastballAvg": 142.3, "fastballMax": 149.0, "strikeouts": 112, "innings": 140.33, "runAllowedPer9": 5.19, "whip": 1.43, "walks": 54, "hits": 147, "homeRuns": 17, "runs": 81, "battersFaced": 619, "kRate": 0.181, "pitches": 2390, "usage": {"fastball": 41.1, "slider": 32.4, "splitter": 18.6, "curveball": 7.9}, "velByType": {"curveball": {"n": 190, "avg": 116.6, "max": 125.0}, "fastball": {"n": 982, "avg": 142.3, "max": 149.0}, "slider": {"n": 774, "avg": 130.8, "max": 139.0}, "splitter": {"n": 444, "avg": 128.1, "max": 136.0}}, "pitchTypes": {"fastball": 41.1, "slider": 32.4, "curve": 7.9, "changeup": 0, "splitter": 18.6}}];
+
+let PLAYERS = [];
+function loadPlayers(){
+  const custom = Store.get('kbo_custom_players', []);
+  const map = new Map();
+  TEST_PLAYERS.forEach(p => map.set(p.name, p));
+  REAL_PLAYERS.forEach(p => map.set(p.name, p));
+  (Array.isArray(custom)?custom:[]).forEach(p => { const r=normalize(p); if(r.ok) map.set(r.p.name, p); });
+  PLAYERS = [...map.values()].map(normalize).filter(r=>r.ok).map(r=>r.p);
+}
+loadPlayers();
+
+// ============================================================
+// 3. 실제 기록 → 게임 밸런스 변환 (기록 값과 밸런스 값은 분리)
+// ============================================================
+function teamColor(s){ let h=0; for(const ch of s) h=(h*31+ch.charCodeAt(0))>>>0; return `hsl(${h%360},55%,36%)`; }
+
+function batterBase(p){
+  const power   = p.hr==null ? 1   : clamp(p.hr/35, 0.25, 1.6);
+  const contact = p.avg==null ? 0.5 : clamp((p.avg-0.2)/0.15, 0, 1);
+  const eye     = p.ops==null ? 0.5 : clamp((p.ops-0.6)/0.3, 0, 1);
+  const speed   = p.sb==null ? 0.3 : clamp(p.sb/30, 0, 1);
+  return {
+    damage: 10 + power*12,
+    range: 62 + eye*60,
+    interval: clamp(0.95 - contact*0.5, 0.4, 1.0),
+    crit: 0.04 + eye*0.18,
+    knock: 80 + power*80,
+    moveBonus: speed*0.12,
+    projSpeed: 0, spread: 0, breakMul: 1, pierce: 0
+  };
+}
+function normPitches(pt){
+  const total = Object.values(pt).reduce((a,b)=>a+b,0) || 1;
+  const out = {}; for(const k in pt) out[k] = pt[k]/total; return out;
+}
+// v5 투수 속성: 실기록에서 계산한 값(0~100). 근거가 없는 값은 null(Data unavailable)
+const nrm = (x,lo,hi) => x==null ? null : clamp((x-lo)/(hi-lo),0,1);
+function pitcherAttrs(p){
+  const avgN = nrm(p.avgVelocity,128,146), mxN = nrm(p.maxVelocity,140,156);
+  const velocity = (avgN==null && mxN==null) ? null : Math.round(100*(0.6*(mxN??avgN) + 0.4*(avgN??mxN)));  // 최고구속 60% + 평균구속 40%
+  const bb9 = (p.walks!=null && p.innings) ? p.walks*9/p.innings : null;
+  const cs = [];
+  if(p.whip!=null) cs.push(clamp((1.7-p.whip)/0.7,0,1));          // WHIP 낮을수록 제구 ↑
+  if(bb9!=null)    cs.push(clamp((5-bb9)/3,0,1));                 // 9이닝당 볼넷 낮을수록 제구 ↑
+  const control = cs.length ? Math.round(100*cs.reduce((a,b)=>a+b,0)/cs.length) : null;
+  const kr = p.kRate!=null ? p.kRate : (p.battersFaced ? p.strikeouts/p.battersFaced : null);
+  const kN = nrm(kr,0.10,0.27); const strikeout = kN==null ? null : Math.round(kN*100);
+  const pt = p.pitchTypes||{};
+  const breaking = Math.round(clamp(((pt.slider||0)+(pt.curve||0)+(pt.splitter||0))/45,0,1)*100);
+  const stamina = p.innings==null ? null : Math.round(clamp((p.innings-20)/160,0,1)*100);
+  return {velocity, control, strikeout, breaking, stamina, clutch:null};   // clutch: 실기록으로 도출 불가 → 제외
+}
+function pitcherBase(p){
+  const A = pitcherAttrs(p);
+  const v=(A.velocity??50)/100, c=(A.control??50)/100, k=(A.strikeout??50)/100, br=(A.breaking??50)/100;
+  const avgV = p.avgVelocity ?? 140;
+  return {
+    damage: 9 + k*10,
+    range: 380,
+    interval: clamp(0.95 - (avgV-130)*0.025, 0.45, 1.0),
+    crit: clamp(0.04 + k*0.10, 0.04, 0.2),
+    knock: 50,
+    moveBonus: 0,
+    projSpeed: clamp(240 + v*220, 240, 520),        // 구속 속성 → 게임 속도 (km/h를 px/s로 직접 쓰지 않음)
+    spread: clamp(0.45*(1-c)+0.03, 0.03, 0.45),     // 제구 속성 → 산포
+    breakMul: 0.8 + br*0.6,                         // 변화구 비중 → 변화 폭
+    pierce: 0,
+    pitches: normPitches(p.pitchTypes || {}),
+    attrs: A
+  };
+}
+
+// 패시브: 실제 기록 조건으로 결정, 효과는 게임 밸런스 값에만 적용
+function passiveFor(p){
+  if(p.mode==='batter'){
+    if(p.hr!=null && p.hr>=30) return {id:'power', name:'Power Hitter', ko:'파워 히터', desc:'공격력 +10%', cond:'홈런 30개 이상 기록 시 항상 적용', stat:`HR ${p.hr}`};
+    if(p.avg!=null && p.avg>=0.3) return {id:'precision', name:'Precision Hitter', ko:'정밀 타격', desc:'치명타 확률 +5%p', cond:'타율 .300 이상 시 항상 적용', stat:`AVG ${fmt3(p.avg)}`};
+    if(p.ops!=null && p.ops>=0.85) return {id:'eye', name:'Extra-Base Instinct', ko:'장타 본능', desc:'공격 범위 +10%', cond:'OPS .850 이상 시 항상 적용', stat:`OPS ${fmt3(p.ops)}`};
+    if(p.sb!=null && p.sb>=20) return {id:'quick', name:'Quick Swing', ko:'빠른 스윙', desc:'공격 간격 -10%', cond:'도루 20개 이상 시 항상 적용', stat:`SB ${p.sb}`};
+    return {id:'concentration', name:'Concentration', ko:'집중력', desc:'체력이 가득 찬 상태에서 공격력 +10%', cond:'체력 100%일 때 발동', stat:'(조건부)'};
+  } else {
+    const bk = (p.pitchTypes.slider||0)+(p.pitchTypes.curve||0);
+    if(p.maxVelocity!=null && p.maxVelocity>=155) return {id:'velocity', name:'High Velocity', ko:'고속 구위', desc:'투사체 속도 +12%', cond:'최고 구속 155 이상 시 항상 적용', stat:`최고 ${p.maxVelocity} km/h`};
+    if(p.strikeouts!=null && p.strikeouts>=150) return {id:'strikeout', name:'Strikeout Instinct', ko:'삼진 본능', desc:'관통 +1, 치명타 +5%p', cond:'탈삼진 150 이상 시 항상 적용', stat:`K ${p.strikeouts}`};
+    if(bk>=35) return {id:'breaking', name:'Breaking-Ball Specialist', ko:'변화구 전문', desc:'슬라이더·커브 변화 폭 +30%', cond:'슬라이더+커브 비중 35% 이상', stat:`변화구 ${bk}%`};
+    if(pitcherAttrs(p).control!=null && pitcherAttrs(p).control>=70) return {id:'control', name:'Precision Control', ko:'정교한 제구', desc:'투구 산포 -40%', cond:'WHIP·볼넷 기준 제구 70 이상', stat:`WHIP ${p.whip!=null?p.whip.toFixed(2):'-'}`};
+    return {id:'pressure', name:'Pressure Management', ko:'압박 관리', desc:'체력 30% 미만일 때 공격력 +25%', cond:'체력 30% 미만에서 발동', stat:'(조건부)'};
+  }
+}
+function applyPassiveBase(b, id){
+  switch(id){
+    case 'power': b.damage*=1.1; break;
+    case 'precision': b.crit+=0.05; break;
+    case 'eye': b.range*=1.1; break;
+    case 'quick': b.interval*=0.9; break;
+    case 'velocity': b.projSpeed*=1.12; break;
+    case 'strikeout': b.pierce+=1; b.crit+=0.05; break;
+    case 'breaking': b.breakMul=1.3; break;
+    case 'control': b.spread*=0.6; break;
+  }
+}
+function statsFor(p){
+  const b = p.mode==='batter' ? batterBase(p) : pitcherBase(p);
+  const passive = passiveFor(p);
+  applyPassiveBase(b, passive.id);
+  return {base:b, passive};
+}
+
+// ============================================================
+// 4. 적 / 보스 / 이벤트 / 아이템 정의
+// ============================================================
+const ETYPES = {
+  standard:{hp:18,spd:55, dmg:8,  r:14,color:'#e0883a',score:10,gem:1},
+  rush:    {hp:9, spd:120,dmg:6,  r:11,color:'#e04040',score:12,gem:1},
+  tank:    {hp:90,spd:26, dmg:18, r:24,color:'#7d8793',score:30,gem:4},
+  ranged:  {hp:22,spd:40, dmg:7,  r:15,color:'#9a5ad6',score:20,gem:2, keep:220, shootInt:2},
+  summoner:{hp:45,spd:30, dmg:8,  r:18,color:'#f0c040',score:35,gem:3, summonInt:6},
+  exploder:{hp:14,spd:80, dmg:30, r:14,color:'#2a2a2a',score:15,gem:2, blast:110},
+};
+const BOSS_DEFS = [
+  {kind:'cheer',  name:'응원 단장 (Cheer Captain)', color:'#b3262e', hp:700, spd:45, r:40},
+  {kind:'charge', name:'돌진 사령관 (Charge Commander)', color:'#c76b1f', hp:800, spd:30, r:42},
+  {kind:'dplay',  name:'더블 플레이 킴 (Double-Play Incarnation)', color:'#2e5fa8', hp:900, spd:35, r:40},
+  {kind:'laser',  name:'숄더 몬스터 (Flaming Cannon Arm)', color:'#7a8a99', hp:750, spd:50, r:38},
+];
+const EVENTS = {
+  heat:{name:'폭염',  msg:'폭염! 이동 속도 감소, 회복 효과 50% 감소'},
+  cold:{name:'추위',  msg:'추운 날씨! 공격 속도 감소'},
+  rain:{name:'비',    msg:'비가 내립니다! 시야가 좁아집니다'},
+  night:{name:'야간 경기', msg:'야간 경기 시작! 조명 주변만 잘 보입니다'},
+  crowd:{name:'홈 관중 응원', msg:'홈 관중이 응원합니다! 피해 +15%'},
+};
+const EV_KEYS = ['heat','cold','rain','night','crowd'];
+const LEVEL_LINES = ['The double-play opportunity is wide open!','Reinforcements are coming from the dugout!','This game is far from over!'];
+const BOSS_LINES = ['Pinch hitter coming in!','A laser throw from the outfield to home!'];
+
+function evMods(){
+  const m = {move:1, rate:1, dmg:1, heal:1, dark:0, hole:0, rain:false, night:false, tint:null};
+  const e = RUN && RUN.ev; if(!e) return m;
+  switch(e.key){
+    case 'heat': m.move=0.9; m.heal=0.5; m.tint='rgba(255,120,40,0.10)'; break;
+    case 'cold': m.rate=0.85; m.tint='rgba(120,180,255,0.12)'; break;
+    case 'rain': m.move=0.95; m.dark=0.85; m.hole=160; m.rain=true; break;
+    case 'night': m.dark=0.55; m.night=true; break;
+    case 'crowd': m.dmg=1.15; m.tint='rgba(255,210,60,0.08)'; break;
+  }
+  return m;
+}
+
+// ============================================================
+// 5-b. v5 레벨업 스킬 시스템 (공용 / 타자 전용 / 투수 전용)
+// 레어도는 획득 시 확정되며 효과 배수와 최대 레벨을 정함. 유효 레벨 u = 레벨 × 배수
+// ============================================================
+const SK_RAR = {
+  common:   {k:'커먼',  c:'#cfd8dc', w:60, mul:1,   max:3},
+  rare:     {k:'레어',  c:'#64b5f6', w:25, mul:1.5, max:4},
+  epic:     {k:'에픽',  c:'#ba68c8', w:12, mul:2,   max:5},
+  legendary:{k:'레전드',c:'#ffd54f', w:3,  mul:3,   max:5},
+};
+const SK_CAT = {shared:{k:'공용', c:'#81c784'}, batter:{k:'타자 전용', c:'#ffb74d'}, pitcher:{k:'투수 전용', c:'#90caf9'}};
+const pct = v => `${Math.round(v*100)}%`;
+const SKILLS = [
+  {id:'atk_dmg',    n:'공격력 강화',   i:'⚔️', cat:'shared', fmt:u=>`공격 피해 +${pct(0.08*u)}`},
+  {id:'atk_rate',   n:'공격 속도 강화', i:'⚡', cat:'shared', fmt:u=>`공격 속도 +${pct(0.06*u)}`},
+  {id:'atk_crit',   n:'치명타 확률',   i:'🎯', cat:'shared', fmt:u=>`치명타 확률 +${pct(0.03*u)}p`},
+  {id:'atk_critdmg',n:'치명타 피해',   i:'💥', cat:'shared', fmt:u=>`치명타 피해 +${pct(0.12*u)}`},
+  {id:'atk_range',  n:'공격 범위',     i:'📏', cat:'shared', fmt:u=>`공격 범위 +${pct(0.06*u)}`},
+  {id:'sv_hp',      n:'최대 체력',     i:'❤️', cat:'shared', fmt:u=>`최대 체력 +${Math.round(12*u)} (획득 시 즉시 회복)`, onLevel:(R,m)=>{R.maxHp+=12*m; R.hp+=12*m;}},
+  {id:'sv_heal',    n:'회복 효율',     i:'💚', cat:'shared', fmt:u=>`회복 아이템 효과 +${pct(0.12*u)}`},
+  {id:'sv_shield',  n:'보호막 지속',   i:'🛡️', cat:'shared', fmt:u=>`보호막 지속 +${(1.2*u).toFixed(1)}초`},
+  {id:'sv_dr',      n:'피해 경감',     i:'🧱', cat:'shared', fmt:u=>`받는 피해 -${pct(Math.min(0.5,0.04*u))}`},
+  {id:'sv_dodge',   n:'위기 회피',     i:'🌀', cat:'shared', fmt:u=>`체력 35% 이하에서 회피 ${pct(Math.min(0.3,0.03*u))}`},
+  {id:'xp_gain',    n:'경험치 증폭',   i:'⭐', cat:'shared', fmt:u=>`경험치 획득 +${pct(0.10*u)}`},
+  {id:'xp_radius',  n:'줍기 범위 확장', i:'🔍', cat:'shared', fmt:u=>`경험치 구슬 줍기 범위 +${pct(0.15*u)}`},
+  {id:'xp_bonus',   n:'보너스 구슬',   i:'💎', cat:'shared', fmt:u=>`구슬 획득 시 추가 구슬 ${pct(Math.min(0.5,0.06*u))}`},
+  {id:'magnet_field',n:'자기장 생성',  i:'🧲', cat:'shared', fmt:u=>`반경 ${Math.round(70+25*u)}px 안의 경험치 구슬을 끌어당김`},
+  {id:'b_double',   n:'더블 샷',       i:'🏏', cat:'batter', fmt:u=>`스윙마다 ${pct(Math.min(0.5,0.08+0.05*u))} 확률로 2번째 스윙 (쿨다운 2.5초)`},
+  {id:'b_power',    n:'파워 스윙',     i:'💪', cat:'batter', fmt:u=>`공격 피해 +${pct(0.08*u)} · 강타 ${pct(0.05+0.02*u)} (피해 ×1.6)`},
+  {id:'b_area',     n:'에어리어 히팅', i:'🌐', cat:'batter', fmt:u=>`사거리 +${pct(0.07*u)} · 타격 폭 확대`},
+  {id:'b_hr',       n:'홈런 히트',     i:'🚀', cat:'batter', fmt:u=>`${pct(0.03+0.025*u)} 확률 홈런 (넉백 ×2, 피해 ×1.5)`},
+  {id:'b_consec',   n:'연속 스윙',     i:'⏱️', cat:'batter', fmt:u=>`타격 후 3초간 공격 간격 -${pct(Math.min(0.5,0.07*u))}`},
+  {id:'b_prec',     n:'정밀 타격',     i:'🔬', cat:'batter', fmt:u=>`치명타 확률 +${pct(0.03*u)}p · 보스 피해 +${pct(0.05*u)}`},
+  {id:'b_long',     n:'롱 히트 본능',  i:'🏃', cat:'batter', fmt:u=>`${pct(0.10+0.04*u)} 확률 피해 ×1.4 + 뒤의 적 관통`},
+  {id:'p_multi',    n:'멀티볼 (일루전 볼)', i:'⚾', cat:'pitcher', fmt:u=>`쌍투구 확률 +${pct(Math.min(0.25,0.06*u))} (전체 상한 ${pct(VOLLEY.max)})`},
+  {id:'p_fast',     n:'패스트볼 강화', i:'🔥', cat:'pitcher', need:'fastball', fmt:u=>`패스트볼 속도 +${pct(0.05*u)} · 피해 +${pct(0.06*u)} · 관통 +${Math.floor(0.5*u)}`},
+  {id:'p_break',    n:'변화구 강화',   i:'🌀', cat:'pitcher', need:'breaking', fmt:u=>`슬라이더·커브 변화 +${pct(0.12*u)} · 체인지업 감속 +${pct(0.08*u)} · 포크 낙차 +${pct(0.10*u)}`},
+  {id:'p_k',        n:'삼진 유도',     i:'🎆', cat:'pitcher', fmt:u=>`${pct(0.05+0.03*u)} 확률 피해 ×2.2 · 보스 피해 +${pct(0.05*u)}`},
+  {id:'p_ctrl',     n:'정교한 제구',   i:'🧭', cat:'pitcher', fmt:u=>`투구 산포 -${pct(Math.min(0.6,0.10*u))} · 판정 반경 +${(0.6*u).toFixed(1)}px`},
+  {id:'p_consec',   n:'연속 투구',     i:'⏩', cat:'pitcher', fmt:u=>`${pct(Math.min(0.5,0.06+0.04*u))} 확률 0.22초 뒤 공 1개 추가 (쿨다운 1.8초)`},
+  {id:'p_clutch',   n:'클러치',        i:'🧨', cat:'pitcher', fmt:u=>`체력 35% 이하 공격 +${pct(0.10*u)} · 받는 피해 -${pct(Math.min(0.25,0.04*u))} · 보스전 공격 +${pct(0.05*u)}`},
+];
+function SK(id){ const R=RUN; const s=R && R.sk && R.sk[id]; return s ? s.lv*SK_RAR[s.rar].mul : 0; }
+function rollRarity(){ let r=Math.random()*100; for(const k of ['common','rare','epic','legendary']){ r-=SK_RAR[k].w; if(r<0) return k; } return 'common'; }
+function skNeedOK(need){
+  const pt=(RUN.player.pitchTypes)||{};
+  if(need==='fastball') return (pt.fastball||0)>=3;
+  if(need==='breaking') return ['slider','curve','changeup','splitter'].some(k=>(pt[k]||0)>=3);
+  return true;
+}
+// 선택지 3개: 보유 중이면 레벨업(최대 레벨 제외), 미보유면 레어도 확정. 카테고리 중복을 우선 피함
+function skillChoices(){
+  const R=RUN, out=[];
+  for(const d of SKILLS){
+    if(d.cat!=='shared' && d.cat!==R.mode) continue;
+    if(d.need && !skNeedOK(d.need)) continue;
+    const o=R.sk[d.id];
+    if(o){ if(o.lv>=SK_RAR[o.rar].max) continue; out.push({d, rar:o.rar, lv:o.lv, owned:true}); }
+    else out.push({d, rar:rollRarity(), lv:0, owned:false});
+  }
+  for(let i=out.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=out[i]; out[i]=out[j]; out[j]=t; }
+  const pick=[], seen=new Set();
+  for(const o of out){ if(pick.length>=3) break; if(!seen.has(o.d.cat)){ pick.push(o); seen.add(o.d.cat); } }
+  for(const o of out){ if(pick.length>=3) break; if(!pick.includes(o)) pick.push(o); }
+  return pick;
+}
+
+const ACH = {
+  first:{n:'첫 처치'}, lv10:{n:'레벨 10 달성'}, boss:{n:'첫 보스 격파'}, combo50:{n:'콤보 50 달성'}, home10:{n:'치명타 10회'}
+};
+function unlock(id){
+  const a = Store.get('kbo_ach', {});
+  if(a[id]) return;
+  a[id]=true; Store.set('kbo_ach', a);
+  if(RUN) toast('업적 달성: '+ACH[id].n, '#9fe0ff');
+}
+
+// ============================================================
+// 5. 런 상태
+// ============================================================
+let state = 'menu';   // menu | playing | paused | levelup | over
+let RUN = null;
+let NICK = '익명', PICKED = null;
+let MODE = 'batter', SELECTED = null;
+let shake = 0;
+
+function newRun(player){
+  const {base, passive} = statsFor(player);
+  return {
+    player, mode:player.mode, base, passive, nick:NICK,
+    t:0, kills:0, score:0, combo:0, comboT:0, maxCombo:0, crits:0,
+    px:1000, py:760, facing:1, moving:false, legPhase:0,
+    hp:100, maxHp:100, lv:1, xp:0, xpNext:10, levelQ:0,
+    up:{dmg:1, rate:1, speed:1, range:1, crit:0, pierce:0, xpMul:1, pick:1, critMul:1, dbl:0},
+    invuln:0, shield:0, shieldT:0, magnetT:0, tacT:0, exclT:0, slowT:0, lobs:[],
+    atkCd:0, swing:null, wind:null, follow:0,
+    bench:3, mates:[], dblCd:0, throwGate:0, banner:null, flashT:0,
+    sk:{}, consT:0, dsCd:0, dsPending:false, extraP:null, extraCd:0,
+    evT:40, ev:null, lastEv:null,
+    bossT:75, boss:null, bossIdx:0, warn:null,
+    enemies:[], eproj:[], proj:[], gems:[], pickups:[],
+    fx:[], texts:[], toasts:[],
+    spawnT:0, passiveFlag:false,
+    teleSeed:0,
+  };
+}
+
+function S(){
+  const R=RUN, b=R.base, u=R.up, ev=evMods(), ex=R.exclT>0, isB=R.mode==='batter';
+  let dmg = b.damage * u.dmg * ev.dmg * (1+0.08*SK('atk_dmg'));
+  if(isB) dmg *= 1+0.08*SK('b_power');
+  if(R.tacT>0) dmg *= 1.5;
+  if(ex && isB) dmg *= 2;
+  if(R.passive.id==='concentration' && R.hp>=R.maxHp) dmg *= 1.1;
+  if(R.passive.id==='pressure' && R.hp<R.maxHp*0.3) dmg *= 1.25;
+  if(!isB && R.hp<R.maxHp*0.35) dmg *= 1+0.10*SK('p_clutch');
+  if(!isB && R.boss) dmg *= 1+0.05*SK('p_clutch');
+  let interval = b.interval/(u.rate*ev.rate*(1+0.06*SK('atk_rate')));
+  if(isB && R.consT>0) interval *= Math.max(0.5, 1-0.07*SK('b_consec'));
+  return {
+    dmg,
+    interval,
+    range: b.range*u.range*(1+0.06*SK('atk_range'))*(isB ? 1+0.07*SK('b_area') : 1)*(ex && isB ? 1.3 : 1),
+    crit: clamp(b.crit+u.crit+0.03*SK('atk_crit')+(isB ? 0.03*SK('b_prec') : 0), 0, 0.9),
+    critMul: 2*u.critMul*(1+0.12*SK('atk_critdmg')),
+    speed: 165*u.speed*ev.move*(1+b.moveBonus)*(R.slowT>0?0.8:1),
+    pierce: b.pierce + u.pierce + (ex && !isB ? 2 : 0),
+    projSpeed: b.projSpeed * (ex && !isB ? 1.3 : 1),
+    spread: b.spread * Math.max(0.4, 1-0.10*SK('p_ctrl')),
+    breakMul: b.breakMul, knock: b.knock,
+  };
+}
+
+// ============================================================
+function txt(x,y,text,col,big){ const R=RUN; if(!R) return; R.texts.push({x,y,text,c:col,t:0,life:big?1.2:0.7,big:!!big}); if(R.texts.length>40) R.texts.shift(); }
+function showDmg(x,y,v,col,crit){ if(!Settings.dmgNum) return; txt(x+rnd(-8,8), y, String(v), col, crit); }
+function fxRing(x,y,col,max,life=0.4){ if(RUN.fx.length>=FX_MAX) return; RUN.fx.push({k:'ring',x,y,c:col,t:0,life,max}); }
+function fxSpark(x,y,col,n=6){ if(RUN.fx.length>=FX_MAX) return; for(let i=0;i<n;i++){ const a=Math.random()*6.283, sp=rnd(60,200); RUN.fx.push({k:'spark',x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,c:col,t:0,life:rnd(0.25,0.5)}); } }
+function toast(text,col='#ffd23f'){ const R=RUN; if(!R) return; R.toasts.push({text,c:col,t:0}); if(R.toasts.length>4) R.toasts.shift(); }
+function addScore(n){ RUN.score += n; }
+
+function comboMul(){ return Math.min(3, 1 + Math.floor(RUN.combo/10)*0.5); }
+function addCombo(){
+  const R=RUN; R.combo++; R.comboT=2.5; R.maxCombo=Math.max(R.maxCombo,R.combo);
+  if([10,25,50,100].includes(R.combo)) toast(`COMBO ${R.combo}! 배율 ×${comboMul().toFixed(1)}`, '#ff9f43');
+  if(R.combo>=50) unlock('combo50');
+}
+
+function sfxHit(){ if(RUN.t-lastHitSfx>0.06){ lastHitSfx=RUN.t; SFX.hit(); } }
+
+function gainXp(v){
+  const R=RUN; R.xp += v*R.up.xpMul*(1+0.10*SK('xp_gain')); SFX.pick();
+  while(R.xp>=R.xpNext){
+    R.xp -= R.xpNext; R.lv++;
+    R.xpNext = Math.floor(10 + R.lv*R.lv*1.4);
+    R.levelQ++;
+    SFX.up(); fxRing(R.px,R.py,'#ffd23f',90,0.5); R.lvFlash=1;
+    toast(`LEVEL UP! Lv.${R.lv}`, '#ffd23f');
+    toast(LEVEL_LINES[Math.floor(Math.random()*LEVEL_LINES.length)], '#9fe0ff');
+    if(R.lv>=10) unlock('lv10');
+  }
+  if(R.levelQ>0 && state==='playing') openLevelUp();
+}
+
+function passiveNote(){ toast(`패시브 발동: ${RUN.passive.ko} (${RUN.passive.name})`, '#9fe0ff'); }
+
+// ============================================================
+// 7. 적 생성 / 업데이트
+// ============================================================
+// v4 설정: 밸런스/상한 수치는 여기서만 조정
+const SPAWN_CFG = {                       // w = 기본 가중치, from = 등장 시작 시간(초)
+  standard:{w:16, from:0},                // 일반 돌진형: 가장 자주 등장
+  rush:    {w:8,  from:20},
+  tank:    {w:4,  from:60},
+  exploder:{w:3,  from:90},
+  summoner:{w:2,  from:120},
+  ranged:  {w:0.6,from:40},               // 투척: 가장 낮은 가중치 (시간에 따라 최대 +0.6)
+};
+const RANGED_MAX = 3;      // 화면에 동시에 존재할 수 있는 투척 몬스터 상한
+const LOB_MAX = 8;         // 동시에 날아가는 맥주/치킨 (= 착지 예측 마커 수)
+const THROW_GAP = 0.35;    // 투척 간 최소 간격(전역) → 여러 몬스터가 같은 순간 던지지 않음
+const PROJ_MAX = 48;       // 투수 투사체 동시 상한
+const EPROJ_MAX = 80;      // 적 투사체 상한
+const FX_MAX = 260;        // 이펙트(스파크/링) 상한
+const VOLLEY = {base:0.15, perLv:0.07, max:0.45, cd:4.0, fan:0.08}; // 쌍투구: 기본 확률, 업그레이드당 증가, 최대, 내부 쿨다운(초), 좌우 각도(rad)
+const ULT = {allies:5, dur:5, dmg:12, range:170, seek:260, leash:340, formR:110, entryR:420};
+
+function pickType(allowRanged=true){
+  const t = RUN.t;
+  const w = [];
+  for(const k in SPAWN_CFG){
+    const c = SPAWN_CFG[k]; if(t < c.from) continue;
+    if(k==='ranged'){ if(!allowRanged) continue; w.push([k, c.w + Math.min(0.6,(t-c.from)/400)]); }
+    else w.push([k, c.w]);
+  }
+  let sum=0; for(const [,v] of w) sum+=v;
+  let r=Math.random()*sum;
+  for(const [k,v] of w){ r-=v; if(r<=0) return k; }
+  return 'standard';
+}
+function spawnEnemy(type,x,y){
+  const R=RUN, T=ETYPES[type];
+  x=clamp(x,30,WW-30); y=clamp(y,30,WH-30);
+  const hm = 1+Math.min(2, R.t/180);
+  const dm = 1+Math.min(1, R.t/300);
+  const sm = 1+Math.min(0.5, R.t/400);
+  R.enemies.push({type,x,y,hp:T.hp*hm,maxHp:T.hp*hm,spd:T.spd*sm,dmg:T.dmg*dm,r:T.r,color:T.color,score:T.score,gem:T.gem,
+    flash:0,t:rnd(0,3),shootT:rnd(1,2),sumT:rnd(2,4),kx:0,ky:0,dead:false,boss:false,
+    throwAnim:0,released:true,thrown:'beer',sumAnim:0});
+}
+function spawnTick(dt){
+  const R=RUN; R.spawnT -= dt; if(R.spawnT>0) return;
+  R.spawnT = Math.max(0.12, 1.1 - R.t/200*0.8) * rnd(0.8,1.2);
+  if(R.enemies.length>=170) return;
+  const n = 1 + Math.floor(R.t/120);
+  let rc=0; for(const e of R.enemies) if(e.type==='ranged' && !e.dead) rc++;   // 동시 투척 몬스터 상한
+  for(let i=0;i<n;i++){
+    const a=rnd(0,Math.PI*2), d=rnd(480,640);
+    const type = pickType(rc < RANGED_MAX);
+    if(type==='ranged') rc++;
+    spawnEnemy(type, R.px+Math.cos(a)*d, R.py+Math.sin(a)*d);
+  }
+}
+function spawnEProj(x,y,dx,dy,spd,dmg,col='#ff7a5a'){ if(RUN.eproj.length>=EPROJ_MAX) return; RUN.eproj.push({x,y,dx,dy,spd,dmg,life:4,r:5,c:col}); }
+
+function explode(e){
+  const R=RUN; e.dead=true;
+  fxRing(e.x,e.y,'#ff8a00',ETYPES.exploder.blast,0.4); fxSpark(e.x,e.y,'#ff8a00',12);
+  if(Math.hypot(R.px-e.x,R.py-e.y)<ETYPES.exploder.blast) hurtPlayer(e.dmg);
+}
+
+function updateEnemies(dt){
+  const R=RUN;
+  for(const e of R.enemies){
+    if(e.dead) continue;
+    const T=ETYPES[e.type];
+    e.t+=dt; if(e.flash>0) e.flash-=dt;
+    const dx=R.px-e.x, dy=R.py-e.y, d=Math.hypot(dx,dy)||0.001, ux=dx/d, uy=dy/d;
+    let mx=ux*e.spd, my=uy*e.spd;
+    if(T.keep){
+      if(d<T.keep-30){ mx=-ux*e.spd; my=-uy*e.spd; }
+      else if(d<T.keep+30){ mx=0; my=0; }
+      e.shootT-=dt;
+      // 투척 몬스터: 와인드업 → 릴리스 프레임(0.15s 남았을 때)에 맥주/치킨 생성
+      if(e.throwAnim>0){
+        e.throwAnim-=dt;
+        if(!e.released && e.throwAnim<=0.15){
+          if(R.lobs.length<LOB_MAX && R.throwGate<=0){ e.released=true; releaseLob(e); R.throwGate=THROW_GAP; }
+          else if(e.throwAnim<=0.02){ e.released=true; }   // 상한/간격 때문에 이번 투척은 취소
+        }
+      }
+      else if(e.shootT<=0){ e.shootT=T.shootInt; e.throwAnim=0.4; e.released=false; e.thrown=Math.random()<0.5?'beer':'chicken'; }
+    }
+    if(e.sumAnim>0) e.sumAnim-=dt;
+    if(T.summonInt){
+      e.sumT-=dt;
+      if(e.sumT<=0){ e.sumT=T.summonInt; e.sumAnim=0.5; for(let i=0;i<2;i++) spawnEnemy('standard', e.x+rnd(-40,40), e.y+rnd(-40,40)); fxRing(e.x,e.y,'#ffd966',40,0.3); }
+    }
+    if(T.blast) e.nearT = d<90 ? 0.3 : Math.max(0,(e.nearT||0)-dt);   // 접근 시 부풀어 오름
+    if(T.blast && d<34){ explode(e); continue; }
+    e.x += (mx+e.kx)*dt; e.y += (my+e.ky)*dt;
+    const decay = Math.pow(0.02, dt); e.kx*=decay; e.ky*=decay;
+    if(!T.blast && d<e.r+12 && R.invuln<=0){ hurtPlayer(e.dmg); e.kx=-ux*260; e.ky=-uy*260; }
+  }
+  R.enemies = R.enemies.filter(e=>!e.dead);
+}
+
+function killEnemy(e){
+  if(e.dead) return;
+  const R=RUN; e.dead=true; R.kills++; addCombo();
+  addScore(Math.round(ETYPES[e.type].score*comboMul()));
+  fxSpark(e.x,e.y,e.color,8); sfxHit();
+  R.gems.push({x:e.x+rnd(-6,6), y:e.y+rnd(-6,6), v:e.gem, t:0, dead:false});
+  if(Math.random()<0.035) dropItem(e.x,e.y);
+  if(R.kills===1) unlock('first');
+}
+
+// ============================================================
+// 8. 보스
+// ============================================================
+function createBoss(idx){
+  const R=RUN, def=BOSS_DEFS[idx%4];
+  const a=rnd(0,Math.PI*2);
+  const x=clamp(R.px+Math.cos(a)*380, 60, WW-60), y=clamp(R.py+Math.sin(a)*380, 60, WH-60);
+  const hp = def.hp*(1+R.t/240)*(1+idx*0.2);
+  return {boss:true, kind:def.kind, name:def.name, color:def.color, r:def.r, spd:def.spd,
+    hp, maxHp:hp, x, y, t:0, dead:false, scored:false, flash:0, teles:[],
+    timer1:2, timer2:4, state:'rest', sT:0, dir:0, shotN:0, kx:0, ky:0};
+}
+function updateBoss(dt){
+  const R=RUN;
+  if(R.warn){
+    R.warn.t-=dt;
+    if(R.warn.t<=0){ R.boss=createBoss(R.bossIdx); R.bossIdx++; R.warn=null; SFX.boss(); toast(BOSS_LINES[Math.floor(Math.random()*BOSS_LINES.length)],'#ff6b6b'); }
+  } else if(!R.boss){
+    R.bossT -= dt;
+    if(R.bossT<=0){ R.warn={t:3, name:BOSS_DEFS[R.bossIdx%4].name}; }
+  }
+  const b=R.boss; if(!b) return;
+  b.t+=dt; if(b.flash>0) b.flash-=dt;
+  const dx=R.px-b.x, dy=R.py-b.y, d=Math.hypot(dx,dy)||0.001, ux=dx/d, uy=dy/d;
+
+  for(const tg of b.teles){ tg.t+=dt; if(!tg.fired && tg.t>=tg.delay){ tg.fired=true; resolveTele(tg); } }
+  b.teles = b.teles.filter(tg=>tg.t < tg.delay+tg.life);
+
+  switch(b.kind){
+    case 'cheer': {
+      b.x+=ux*b.spd*dt; b.y+=uy*b.spd*dt;
+      b.timer1-=dt; if(b.timer1<=0){ b.timer1=3; for(let i=0;i<12;i++){ const a=i/12*Math.PI*2; spawnEProj(b.x,b.y,Math.cos(a),Math.sin(a),170,10); } }
+      b.timer2-=dt; if(b.timer2<=0){ b.timer2=6; for(let i=0;i<3;i++) spawnEnemy('standard', b.x+rnd(-60,60), b.y+rnd(-60,60)); toast('응원단 등장!','#ff9f43'); }
+      break;
+    }
+    case 'charge': {
+      b.sT+=dt;
+      if(b.state==='rest'){
+        b.x+=ux*b.spd*0.5*dt; b.y+=uy*b.spd*0.5*dt;
+        if(b.sT>1.4){ b.state='aim'; b.sT=0; }
+      } else if(b.state==='aim'){
+        b.dir=Math.atan2(R.py-b.y, R.px-b.x);
+        if(b.sT>1.0){ b.state='dash'; b.sT=0; }
+      } else if(b.state==='dash'){
+        b.x+=Math.cos(b.dir)*480*dt; b.y+=Math.sin(b.dir)*480*dt;
+        if(d<b.r+14 && R.invuln<=0){ hurtPlayer(24); b.state='rest'; b.sT=0; }
+        if(b.sT>0.8){ b.state='rest'; b.sT=0; }
+      }
+      break;
+    }
+    case 'dplay': {
+      b.x+=ux*b.spd*dt; b.y+=uy*b.spd*dt;
+      b.timer1-=dt; if(b.timer1<=0){ b.timer1=2.6; for(let i=0;i<3;i++) b.teles.push({k:'zone', x:R.px, y:R.py, r:48, delay:0.7+i*0.45, life:0.25, t:0, fired:false}); }
+      b.timer2-=dt; if(b.timer2<=0){ b.timer2=4.5; const a=Math.atan2(uy,ux); for(const o of [-0.25,0,0.25]) spawnEProj(b.x,b.y,Math.cos(a+o),Math.sin(a+o),260,12,'#8fd0ff'); }
+      break;
+    }
+    case 'laser': {
+      if(d<260){ b.x-=ux*b.spd*dt; b.y-=uy*b.spd*dt; }
+      else if(d>340){ b.x+=ux*b.spd*dt; b.y+=uy*b.spd*dt; }
+      b.timer1-=dt;
+      if(b.timer1<=0){ b.timer1=2.2; b.shotN++; b.teles.push({k:'line', x:b.x, y:b.y, ang:Math.atan2(uy,ux), delay:0.7, life:0.15, t:0, fired:false, triple: b.shotN%3===0}); }
+      break;
+    }
+  }
+  b.x=clamp(b.x,60,WW-60); b.y=clamp(b.y,60,WH-60);
+  if((b.kind!=='charge' || b.state!=='dash') && d<b.r+12 && R.invuln<=0) hurtPlayer(8);
+}
+function resolveTele(tg){
+  const R=RUN;
+  if(tg.k==='zone'){
+    if(Math.hypot(R.px-tg.x,R.py-tg.y)<tg.r+12) hurtPlayer(18);
+    fxRing(tg.x,tg.y,'#ff3b3b',tg.r,0.3);
+  } else if(tg.k==='line'){
+    const angs = tg.triple ? [-0.2,0,0.2] : [0];
+    for(const a of angs) spawnEProj(tg.x,tg.y,Math.cos(tg.ang+a),Math.sin(tg.ang+a),620,14,'#fff4a0');
+  }
+}
+function bossDown(b){
+  const R=RUN; if(b.dead) return; b.dead=true; R.boss=null; R.bossT=70; R.kills++;
+  addScore(Math.round(500*comboMul()) + 300);
+  fxRing(b.x,b.y,'#ffd23f',180,0.8); fxSpark(b.x,b.y,'#ffd23f',20);
+  txt(b.x,b.y-60,'홈런! 보스 격파!','#ffd23f',true);
+  for(let i=0;i<6;i++) R.gems.push({x:b.x+rnd(-50,50), y:b.y+rnd(-50,50), v:10, t:0, dead:false});
+  dropItem(b.x,b.y); dropItem(b.x+30,b.y+20);
+  SFX.up(); unlock('boss');
+}
+
+// ============================================================
+// 9. 플레이어 피해 / 아이템
+// ============================================================
+function hurtPlayer(d){
+  const R=RUN; if(R.invuln>0 || state!=='playing') return;
+  const low = R.hp < R.maxHp*0.35;
+  if(low && Math.random() < Math.min(0.3, 0.03*SK('sv_dodge'))){ txt(R.px,R.py-30,'회피!','#7fd6ff',false); R.invuln=0.3; return; }
+  let dmg = d*(1-Math.min(0.5, 0.04*SK('sv_dr')));
+  if(low && R.mode==='pitcher') dmg *= 1-Math.min(0.25, 0.04*SK('p_clutch'));
+  if(R.shield>0){
+    const a=Math.min(R.shield,dmg); R.shield-=a; dmg-=a;
+    txt(R.px,R.py-30,'차단','#7fd6ff',false);
+    if(dmg<=0){ R.invuln=0.2; return; }
+  }
+  R.hp -= dmg; R.invuln=0.5; shake=6;
+  txt(R.px,R.py-28,String(Math.round(dmg)),'#ff6b6b',false);
+  SFX.hurt();
+  if(R.passive.id==='pressure' && R.hp<R.maxHp*0.3 && !R.passiveFlag){ R.passiveFlag=true; toast('패시브 발동: 압박 관리 (공격력 +25%)','#9fe0ff'); }
+  if(R.hp<=0){ R.hp=0; endRun(); }
+}
+
+function dropItem(x,y){
+  const R=RUN;
+  const excl = R.mode==='batter' ? 'excl_bat' : 'excl_pitch';
+  const w = [['heal',35],['shield',22],['magnet',18],['tactical',18],[excl,7]];
+  let sum=0; for(const [,v] of w) sum+=v;
+  let r=Math.random()*sum, kind='heal';
+  for(const [k,v] of w){ r-=v; if(r<=0){ kind=k; break; } }
+  R.pickups.push({k:kind, x:x+rnd(-10,10), y:y+rnd(-10,10), t:0, dead:false});
+}
+function applyItem(k){
+  const R=RUN;
+  switch(k){
+    case 'heal': { const amt=Math.round(R.maxHp*0.25*evMods().heal*(1+0.12*SK('sv_heal'))); R.hp=Math.min(R.maxHp,R.hp+amt); R.healT=1; txt(R.px,R.py-30,'+'+amt,'#7CFC7C',false); toast('체력 회복!','#7CFC7C'); break; }
+    case 'shield': R.shield=40; R.shieldT=8+1.2*SK('sv_shield'); toast(`보호막 (${R.shieldT.toFixed(1)}초, 40 흡수)`,'#7fd6ff'); break;
+    case 'magnet': R.magnetT=8; toast('자석: 경험치 구슬 전체 흡수 (8초)','#ff6b6b'); break;
+    case 'tactical': R.tacT=10; toast('감독의 작전 지시! 공격력 +50% (10초)','#ffd23f'); break;
+    case 'excl_bat': R.exclT=8; toast('홈런 메이커 방망이! 공격력 2배, 사거리 +30% (8초)','#ffd23f'); break;
+    case 'excl_pitch': R.exclT=8; toast('라이트닝 패스트볼! 투사체 속도 +30%, 관통 +2 (8초)','#ffd23f'); break;
+  }
+  SFX.item();
+}
+
+// ============================================================
+// 10. 공격 — 타자 / 투수
+// ============================================================
+function nearestEnemy(x,y,range){
+  const R=RUN; let best=null, bd=range;
+  const check = e => { if(e.dead) return; const d=Math.hypot(e.x-x,e.y-y); if(d<=bd+e.r){ bd=d; best=e; } };
+  for(const e of R.enemies) check(e);
+  if(R.boss) check(R.boss);
+  return best;
+}
+function allTargets(){ const R=RUN; return R.boss ? R.enemies.concat([R.boss]) : R.enemies; }
+
+function damageEnemy(e,dmg,crit){
+  if(e.dead) return;
+  e.hp -= dmg; e.flash = 0.1;
+  showDmg(e.x, e.y-e.r-6, Math.round(dmg), crit?'#ffd23f':'#ffffff', crit);
+  if(crit){ fxRing(e.x,e.y,'#ffd23f',40,0.25); SFX.crit(); RUN.crits++; if(RUN.crits>=10) unlock('home10'); }
+  else sfxHit();
+  if(e.hp<=0){ if(e.boss) bossDown(e); else killEnemy(e); }
+}
+
+function startSwing(s, dir, second){
+  const R=RUN;
+  R.swing={t:0, hit:false, dir, second:!!second, dur: second?0.26:0.32, hitAt: second?0.12:0.14};
+  R.facing = Math.cos(dir)>=0 ? 1 : -1;
+  SFX.swing();
+  if(second){ txt(R.px, R.py-44, 'DOUBLE SHOT!', '#ffd23f', true); fxRing(R.px,R.py,'#ffd23f',70,0.3); }
+}
+function updateBatter(dt,s){
+  const R=RUN;
+  if(R.consT>0) R.consT-=dt;
+  if(R.dsCd>0) R.dsCd-=dt;
+  if(R.swing){
+    R.swing.t+=dt;
+    if(!R.swing.hit && R.swing.t>=R.swing.hitAt){ R.swing.hit=true; swingImpact(s); }
+    if(R.swing.t>=R.swing.dur){
+      R.swing=null;
+      if(R.dsPending){   // 더블 샷: 첫 스윙 직후 두 번째 독립 스윙
+        R.dsPending=false;
+        const t2=nearestEnemy(R.px,R.py,s.range);
+        if(t2) startSwing(s, Math.atan2(t2.y-R.py,t2.x-R.px), true);
+      }
+    }
+  }
+  if(!R.swing && R.atkCd<=0){
+    const tgt = nearestEnemy(R.px,R.py,s.range);
+    if(tgt){
+      const dir=Math.atan2(tgt.y-R.py, tgt.x-R.px);
+      startSwing(s, dir, false);
+      R.atkCd=s.interval;
+      if(SK('b_double')>0 && R.dsCd<=0 && Math.random() < Math.min(0.5, 0.08+0.05*SK('b_double'))){ R.dsPending=true; R.dsCd=2.5; }
+    }
+  }
+}
+function swingImpact(s){
+  const R=RUN, sw=R.swing, a=sw.dir;
+  const cone = 1.2 + 0.12*SK('b_area');
+  fxRing(R.px+Math.cos(a)*s.range*0.6, R.py+Math.sin(a)*s.range*0.6, sw.second?'#ffd23f':'#ffffff', s.range*0.8, 0.3);
+  let hits=0, anyCrit=false, struck=null;
+  for(const e of allTargets()){
+    if(e.dead) continue;
+    const dx=e.x-R.px, dy=e.y-R.py, d=Math.hypot(dx,dy);
+    if(d>s.range+e.r) continue;
+    const ang=Math.atan2(dy,dx); let diff=Math.abs(ang-a); diff=Math.min(diff,2*Math.PI-diff);
+    if(diff>cone) continue;
+    const crit = Math.random()<s.crit;
+    let mult = crit ? s.critMul : 1, kn = s.knock;
+    if(SK('b_power')>0 && Math.random()<0.05+0.02*SK('b_power')){ mult*=1.6; txt(e.x,e.y-56,'POWER!','#ffb74d',false); }
+    if(SK('b_hr')>0 && Math.random()<0.03+0.025*SK('b_hr')){ mult*=1.5; kn*=2; txt(e.x,e.y-40,'HOME RUN!','#ff5a5a',true); fxRing(e.x,e.y,'#ff5a5a',90,0.4); }
+    if(SK('b_long')>0 && Math.random()<0.10+0.04*SK('b_long')){ mult*=1.4; struck=e; }
+    if(e.boss && SK('b_prec')>0) mult *= 1+0.05*SK('b_prec');
+    hits++;
+    if(!e.boss){ e.kx=Math.cos(ang)*kn; e.ky=Math.sin(ang)*kn; }
+    damageEnemy(e, s.dmg*mult, crit);
+    if(crit){ anyCrit=true; txt(e.x,e.y-30,'HOME RUN!','#ff5a5a',true); }
+  }
+  if(struck){                                         // 롱 히트 관통: 맞은 적 뒤쪽 가까운 적에게 추가 피해
+    for(const f of allTargets()){ if(f.dead || f===struck || f.boss) continue; if(Math.hypot(f.x-struck.x,f.y-struck.y)<70) damageEnemy(f, s.dmg*0.6, false); }
+  }
+  if(hits>=3) txt(R.px, R.py-50, 'EXTRA BASE!', '#9fe0ff', true);
+  if(anyCrit) { shake=Math.max(shake,4); }
+  if(!anyCrit && hits>0) fxSpark(R.px+Math.cos(a)*s.range*0.5, R.py+Math.sin(a)*s.range*0.5, '#fff', 4);
+  if(hits>0 && SK('b_consec')>0) R.consT=3;
+}
+
+function pickPitch(pitches){
+  let r=Math.random();
+  for(const k in pitches){ r-=pitches[k]; if(r<=0) return k; }
+  return 'fastball';
+}
+function updatePitcher(dt,s){
+  const R=RUN;
+  if(R.extraCd>0) R.extraCd-=dt;
+  if(R.extraP){ R.extraP.t-=dt; if(R.extraP.t<=0){ const ex=R.extraP; R.extraP=null; releasePitch(s, ex.dir, ex.type, true); } }
+  if(R.wind){
+    R.wind.t+=dt;
+    if(R.wind.t>=0.32){
+      const tgt = nearestEnemy(R.px,R.py,s.range);
+      const dir = tgt ? Math.atan2(tgt.y-R.py, tgt.x-R.px) : R.wind.dir;
+      releasePitch(s,dir,R.wind.type);
+      R.wind=null; R.follow=0.22;
+    }
+  }
+  if(R.follow>0) R.follow=Math.max(0,R.follow-dt);
+  if(!R.wind && R.atkCd<=0){
+    const tgt=nearestEnemy(R.px,R.py,s.range);
+    if(tgt){
+      const dir=Math.atan2(tgt.y-R.py, tgt.x-R.px);
+      R.wind={t:0, dir, type:pickPitch(R.base.pitches)};
+      R.atkCd=s.interval;
+      R.facing = Math.cos(dir)>=0 ? 1 : -1;
+    }
+  }
+}
+// 쌍투구 확률 = 기본 확률 + 스킬 추가 확률 (추가분 별도 상한, 전체 상한 VOLLEY.max)
+function volleyChance(){ const added=Math.min(0.25, 0.06*SK('p_multi')); return Math.min(VOLLEY.max, VOLLEY.base + added); }
+// 쌍투구 판정: 투수 전용, 내부 쿨다운 중이면 불가. 발동 시 쿨다운 시작
+function rollVolley(){
+  const R=RUN;
+  if(R.mode!=='pitcher' || R.dblCd>0) return false;
+  if(Math.random() >= volleyChance()) return false;
+  R.dblCd = VOLLEY.cd; return true;
+}
+function releasePitch(s,dir,type,chained=false){
+  const R=RUN;
+  if(R.proj.length>=PROJ_MAX) return;
+  const n = (!chained && rollVolley()) ? 2 : 1;
+  const hx=R.px+R.facing*10, hy=R.py-6;
+  const side0 = Math.random()<0.5?-1:1;
+  const kc = Math.min(0.5, 0.05+0.03*SK('p_k'));
+  const fanW = VOLLEY.fan + 0.01*SK('p_multi');
+  const bm = s.breakMul * ((type==='slider'||type==='curve') ? 1+0.12*SK('p_break') : 1);
+  const dec = 0.9*(1+0.10*SK('p_break'));
+  const ctrlR = 0.6*SK('p_ctrl');
+  for(let k=0;k<n;k++){
+    const fan = n===1 ? 0 : (k===0 ? -fanW : fanW);
+    const sp = n===1 ? 0 : (k===0 ? -6 : 6);
+    const ox = -Math.sin(dir)*sp, oy = Math.cos(dir)*sp;
+    let spd = s.projSpeed * (type==='changeup' ? 0.6*(1-0.08*SK('p_break')) : 1);
+    if(type==='fastball') spd *= 1+0.05*SK('p_fast');
+    const d = dir + fan + rnd(-s.spread, s.spread);
+    const dmg = s.dmg*(type==='splitter'?1.2:1)*(type==='fastball'?1+0.06*SK('p_fast'):1);
+    const pierce = s.pierce + (type==='fastball' ? Math.floor(0.5*SK('p_fast')) : 0);
+    R.proj.push({x:hx+ox,y:hy+oy,bx:hx+ox,by:hy+oy,type,dir:d,spd,t:0,life:1.6,
+      dmg, side: n===1 ? side0 : (k===0?-1:1), pierce, hit:new Set(), r:6, dead:false, dbl:n===2,
+      bm, dec, kc, ctrlR});
+  }
+  if(!chained && R.extraCd<=0 && SK('p_consec')>0 && Math.random() < Math.min(0.5, 0.06+0.04*SK('p_consec'))){
+    R.extraP={t:0.22, dir, type}; R.extraCd=1.8;   // 연속 투구: 같은 방향으로 공 1개 추가
+  }
+  if(n===2){ SFX.double(); txt(hx,hy-30,'쌍투구!','#9fe0ff',true); fxRing(hx,hy,'#9fe0ff',50,0.3); }
+  else SFX.pitch();
+}
+function updateProjectiles(dt,s){
+  const R=RUN;
+  const targets = allTargets();          // 프레임당 1회만 생성 (투사체마다 배열을 새로 만들지 않음)
+  for(const p of R.proj){
+    if(p.dead) continue;
+    p.t+=dt; p.life-=dt;
+    if(Math.hypot(p.x-R.px,p.y-R.py)>1400){ p.dead=true; continue; }   // 화면 밖 장거리 투사체 즉시 정리 (수명 1.6s 내 도달 거리보다 큼 → 판정 변화 없음)
+    const spd = p.type==='splitter' ? p.spd*(1-Math.min(0.55,p.t*(p.dec||0.9))) : p.spd;
+    p.bx+=Math.cos(p.dir)*spd*dt; p.by+=Math.sin(p.dir)*spd*dt;
+    let off=0;
+    if(p.type==='slider') off=Math.sin(Math.min(p.t,0.6)*Math.PI/0.6)*16*p.side*(p.bm||1);
+    else if(p.type==='curve') off=Math.sin(Math.min(p.t,1.0)*Math.PI)*38*p.side*(p.bm||1);
+    p.x = p.bx - Math.sin(p.dir)*off;
+    p.y = p.by + Math.cos(p.dir)*off;
+    if(p.life<=0){ p.dead=true; continue; }
+    for(const e of targets){
+      if(e.dead || p.hit.has(e)) continue;
+      if(Math.hypot(e.x-p.x,e.y-p.y) < e.r+p.r+(p.ctrlR||0)){
+        p.hit.add(e);
+        const crit = Math.random()<s.crit;
+        if(crit && !e.boss) txt(e.x,e.y-30,'STRIKEOUT!','#ffd23f',true);
+        let dmg = p.dmg*(crit?s.critMul:1);
+        if(p.kc && Math.random()<p.kc){ dmg*=2.2; txt(e.x,e.y-44,'삼진 유도!','#ffd23f',true); }
+        if(e.boss && SK('p_k')>0) dmg *= 1+0.05*SK('p_k');
+        damageEnemy(e, dmg, crit);
+        if(p.hit.size>p.pierce){ p.dead=true; break; }
+      }
+    }
+  }
+  R.proj = R.proj.filter(p=>!p.dead);
+}
+
+// ============================================================
+// 11. 벤치 클리어링 (팀 동료 지원)
+// ============================================================
+function activateBench(){
+  const R=RUN;
+  if(!R || state!=='playing') return;
+  if(R.mates.length) return;
+  if(R.bench<=0){ toast('벤치 클리어링을 모두 사용했습니다','#aaaaaa'); return; }
+  R.bench--;
+  const uni = teamColor(R.player.team);
+  R.mates=[];
+  for(let i=0;i<ULT.allies;i++){
+    const a = -Math.PI/2 + i*2*Math.PI/ULT.allies;          // 5명: 원형으로 균등하게 서로 다른 방향에서 진입
+    const ex=R.px+Math.cos(a)*ULT.entryR, ey=R.py+Math.sin(a)*ULT.entryR;
+    R.mates.push({i, a, ex, ey, x:ex, y:ey, wait:i*0.07, ep:0, t:ULT.dur,
+      cd:0.3+i*0.14, sw:0, facing:1, uni, trail:[]});
+  }
+  R.banner={t:0, life:1.8, text:'ULTIMATE! 벤치 클리어링', sub:`팀 동료 ${ULT.allies}명 등장`};
+  R.flashT=0.35; shake=Math.max(shake,12);
+  fxRing(R.px,R.py,'#ffd23f',260,0.6);
+  fxRing(R.px,R.py,'#ffffff',170,0.4);
+  txt(R.px,R.py-60,'ULTIMATE!','#ffd23f',true);
+  toast(`벤치 클리어링! 팀 동료 ${ULT.allies}명 등장 (남은 ${R.bench}회)`,'#ffd23f');
+  SFX.ult();
+}
+function mateFormPos(m){ const R=RUN; return [R.px+Math.cos(m.a)*ULT.formR, R.py+Math.sin(m.a)*ULT.formR]; }
+function updateMates(dt,s){
+  const R=RUN; if(!R.mates.length) return;
+  const dmg = ULT.dmg*s.dmg/Math.max(1,S().dmg/RUN.base.damage);
+  for(const m of R.mates){
+    m.t-=dt; m.cd-=dt; m.sw=Math.max(0,m.sw-dt);
+    for(let k=m.trail.length-1;k>=0;k--){ m.trail[k].t+=dt; if(m.trail[k].t>0.22) m.trail.splice(k,1); }
+    const [fx0,fy0]=mateFormPos(m);
+    if(m.wait>0){ m.wait-=dt; m.x=m.ex; m.y=m.ey; continue; }          // 순차 진입 대기 (숨김)
+    if(m.ep<1){                                                          // 진입 돌진 0.45s (ease-out)
+      m.ep=Math.min(1,m.ep+dt/0.45);
+      const e=1-Math.pow(1-m.ep,3);
+      m.x=lerp(m.ex,fx0,e); m.y=lerp(m.ey,fy0,e);
+      m.trail.push({x:m.x,y:m.y,t:0}); if(m.trail.length>6) m.trail.shift();
+      if(m.ep>=1){ fxRing(fx0,fy0,m.uni,90,0.35); fxSpark(fx0,fy0,'#ffffff',8); }
+      continue;
+    }
+    const tgt = nearestEnemy(m.x,m.y,260);                               // 독립 전투: 각자 가장 가까운 적
+    if(tgt){
+      const dx=tgt.x-m.x, dy=tgt.y-m.y, dd=Math.hypot(dx,dy)||0.001;
+      if(dd>150){ const st=Math.min(dd,ULT.seek*dt); m.x+=dx/dd*st; m.y+=dy/dd*st; }
+      m.facing = dx>=0?1:-1;
+      if(dd<=ULT.range && m.cd<=0){
+        m.cd=0.8; m.sw=0.25;
+        const ang=Math.atan2(dy,dx);
+        if(!tgt.boss){ tgt.kx=Math.cos(ang)*160; tgt.ky=Math.sin(ang)*160; }
+        fxSpark(tgt.x,tgt.y,m.uni,8); fxRing(tgt.x,tgt.y,'#ffd23f',34,0.22);
+        damageEnemy(tgt, dmg, false);                                    // 처치 보상은 기존 killEnemy 경로에서만 1회 지급
+      }
+    } else {
+      m.x=lerp(m.x,fx0,Math.min(1,dt*5)); m.y=lerp(m.y,fy0,Math.min(1,dt*5));
+    }
+    const lp=Math.hypot(m.x-R.px,m.y-R.py);                              // 플레이어 주변 이탈 방지
+    if(lp>ULT.leash){ m.x=R.px+(m.x-R.px)*ULT.leash/lp; m.y=R.py+(m.y-R.py)*ULT.leash/lp; }
+  }
+  for(let a=0;a<R.mates.length;a++) for(let b=a+1;b<R.mates.length;b++){  // 아군끼리 겹침 방지
+    const A=R.mates[a], B=R.mates[b];
+    if(A.wait>0||B.wait>0) continue;
+    const dx=B.x-A.x, dy=B.y-A.y, d=Math.hypot(dx,dy)||0.001;
+    if(d<44){ const p=(44-d)/2; A.x-=dx/d*p; A.y-=dy/d*p; B.x+=dx/d*p; B.y+=dy/d*p; }
+  }
+  const alive=[];
+  for(const m of R.mates){
+    if(m.t<=0){ fxRing(m.x,m.y,'#ffd23f',60,0.4); fxRing(m.x,m.y,m.uni,40,0.3); continue; }   // 종료: 이펙트 후 제거
+    alive.push(m);
+  }
+  R.mates=alive;
+}
+
+// ============================================================
+// 12. 이벤트 / 주기 업데이트
+// ============================================================
+function updateEvents(dt){
+  const R=RUN;
+  if(R.ev){
+    R.ev.t-=dt;
+    if(R.ev.t<=0){ toast(`${EVENTS[R.ev.key].name} 종료 — 능력치 원래대로`,'#9fe0ff'); if(R.ev.key==='rain') stopRain(); R.ev=null; R.evT=rnd(28,38); }
+  } else {
+    R.evT-=dt;
+    if(R.evT<=0){
+      let k;
+      do{ k=EV_KEYS[Math.floor(Math.random()*EV_KEYS.length)]; } while(k===R.lastEv && Math.random()<0.8);
+      R.lastEv=k; R.ev={key:k, t:20};
+      toast(EVENTS[k].msg,'#9fe0ff');
+      if(k==='rain') startRain();
+    }
+  }
+}
+
+function updatePickups(dt){
+  const R=RUN;
+  for(const p of R.pickups){
+    p.t+=dt;
+    if(Math.hypot(p.x-R.px,p.y-R.py)<24){ applyItem(p.k); p.dead=true; }
+  }
+  R.pickups=R.pickups.filter(p=>!p.dead && p.t<40);
+}
+function updateGems(dt){
+  const R=RUN, pr=42*R.up.pick*(1+0.15*SK('xp_radius'));
+  const fR=70+25*SK('magnet_field'), fSp=280+40*SK('magnet_field');
+  const extra=[];
+  for(const g of R.gems){
+    const dx=R.px-g.x, dy=R.py-g.y, d=Math.hypot(dx,dy);
+    let sp=0;
+    if(R.magnetT>0) sp=520;                                   // 드랍 아이템 자석 (기존 규칙 유지)
+    if(SK('magnet_field')>0 && d<fR) sp=Math.max(sp,fSp);     // 자기장 스킬: 같은 구슬에 두 값 중 큰 값만 적용 → 중복 가산 없음
+    if(d<pr) sp=Math.max(sp,320);
+    if(sp>0 && d>0.001){ g.x+=dx/d*sp*dt; g.y+=dy/d*sp*dt; }
+    if(Math.hypot(R.px-g.x,R.py-g.y)<14){
+      g.dead=true; gainXp(g.v);
+      if(SK('xp_bonus')>0 && Math.random()<Math.min(0.5,0.06*SK('xp_bonus'))) extra.push({x:g.x+rnd(-10,10), y:g.y+rnd(-10,10), v:g.v, t:0, dead:false});
+    }
+  }
+  R.gems=R.gems.filter(g=>!g.dead).concat(extra);
+}
+function updateFx(dt){
+  const R=RUN;
+  for(const f of R.fx){ f.t+=dt; if(f.k==='spark'){ f.x+=f.vx*dt; f.y+=f.vy*dt; f.vx*=0.9; f.vy*=0.9; } }
+  R.fx=R.fx.filter(f=>f.t<f.life);
+  for(const x of R.texts){ x.t+=dt; x.y-=28*dt; }
+  R.texts=R.texts.filter(x=>x.t<x.life);
+  for(const t of R.toasts) t.t+=dt;
+  R.toasts=R.toasts.filter(t=>t.t<2.6);
+}
+function updateEProj(dt){
+  const R=RUN;
+  for(const p of R.eproj){
+    p.x+=p.dx*p.spd*dt; p.y+=p.dy*p.spd*dt; p.life-=dt;
+    if(Math.hypot(p.x-R.px,p.y-R.py)<p.r+12){ hurtPlayer(p.dmg); p.life=-1; }
+  }
+  R.eproj=R.eproj.filter(p=>p.life>0);
+}
+
+// ============================================================
+// 13. 메인 업데이트
+// ============================================================
+function readInput(){
+  let x=0,y=0;
+  if(keys['a']||keys['arrowleft']) x-=1;
+  if(keys['d']||keys['arrowright']) x+=1;
+  if(keys['w']||keys['arrowup']) y-=1;
+  if(keys['s']||keys['arrowdown']) y+=1;
+  if(joy.on){ x+=joy.x; y+=joy.y; }
+  return {x:clamp(x,-1,1), y:clamp(y,-1,1)};
+}
+function update(dt){
+  const R=RUN; R.t+=dt;
+  if(R.invuln>0) R.invuln-=dt;
+  if(R.shieldT>0){ R.shieldT-=dt; if(R.shieldT<=0) R.shield=0; }
+  if(R.magnetT>0) R.magnetT-=dt;
+  if(R.tacT>0) R.tacT-=dt;
+  if(R.exclT>0) R.exclT-=dt;
+  if(R.slowT>0) R.slowT-=dt;
+  if(R.healT>0) R.healT-=dt;
+  if(R.lvFlash>0) R.lvFlash-=dt;
+  if(R.dblCd>0) R.dblCd-=dt;
+  if(R.throwGate>0) R.throwGate-=dt;
+  if(R.flashT>0) R.flashT-=dt;
+  if(R.banner){ R.banner.t+=dt; if(R.banner.t>=R.banner.life) R.banner=null; }
+  if(R.comboT>0){ R.comboT-=dt; if(R.comboT<=0) R.combo=0; }
+  if(shake>0) shake=Math.max(0, shake-dt*40);
+  R.atkCd-=dt;
+
+  updateEvents(dt);
+  const s=S();
+
+  const iv=readInput(); const len=Math.hypot(iv.x,iv.y);
+  if(len>0.01){
+    const mag=Math.min(1,len), nx=iv.x/len, ny=iv.y/len;
+    R.px+=nx*s.speed*mag*dt; R.py+=ny*s.speed*mag*dt;
+    R.legPhase+=dt*14*mag; R.moving=true;
+    if(Math.abs(nx)>0.2 && !R.swing && !R.wind) R.facing = nx>0?1:-1;
+  } else R.moving=false;
+  R.px=clamp(R.px,40,WW-40); R.py=clamp(R.py,40,WH-40);
+
+  if(R.mode==='batter') updateBatter(dt,s); else updatePitcher(dt,s);
+  updateProjectiles(dt,s);
+  spawnTick(dt);
+  updateEnemies(dt);
+  updateEProj(dt);
+  updateLobs(dt);
+  updateBoss(dt);
+  updateMates(dt,s);
+  updatePickups(dt);
+  updateGems(dt);
+  updateFx(dt);
+  if(R.hp<=0 && state==='playing') endRun();
+}
+
+// ============================================================
+// 14. 렌더링 (배경 사전 렌더 + 카메라 + 엔티티)
+// ============================================================
+const bgC = document.createElement('canvas'); bgC.width=WW; bgC.height=WH;
+const LIGHTS = [[300,260],[1700,260],[300,1140],[1700,1140]];
+function buildStadium(g){
+  g.fillStyle='#2f7d32'; g.fillRect(0,0,WW,WH);
+  for(let x=0;x<WW;x+=100){ g.fillStyle=((x/100)%2)?'#338a36':'#2c7430'; g.fillRect(x,0,100,WH); }
+  const stand=(x,y,w,h)=>{
+    g.fillStyle='#3b4a5a'; g.fillRect(x,y,w,h);
+    for(let yy=y+6; yy<y+h-4; yy+=10) for(let xx=x+4; xx<x+w-4; xx+=9){
+      g.fillStyle = ((xx*31+yy*17)%7===0) ? '#e0c060' : ((xx+yy)%5===0 ? '#c04848' : '#56708a');
+      g.fillRect(xx,yy,5,5);
+    }
+  };
+  stand(0,0,WW,150); stand(0,WH-150,WW,150); stand(0,0,150,WH); stand(WW-150,0,150,WH);
+  g.fillStyle='#b8864f'; g.beginPath(); g.arc(1000,740,250,0,Math.PI*2); g.fill();
+  g.fillStyle='#3f9a42'; g.beginPath(); g.moveTo(1000,880); g.lineTo(1140,740); g.lineTo(1000,600); g.lineTo(860,740); g.closePath(); g.fill();
+  g.strokeStyle='#fff'; g.lineWidth=3;
+  g.beginPath(); g.moveTo(1000,880); g.lineTo(400,280); g.moveTo(1000,880); g.lineTo(1600,280); g.stroke();
+  g.fillStyle='#fff';
+  for(const [bx,by] of [[1140,740],[1000,600],[860,740]]){ g.save(); g.translate(bx,by); g.rotate(Math.PI/4); g.fillRect(-9,-9,18,18); g.restore(); }
+  g.beginPath(); g.moveTo(990,870); g.lineTo(1010,870); g.lineTo(1010,884); g.lineTo(1000,892); g.lineTo(990,884); g.closePath(); g.fill();
+  g.fillStyle='#c59a63'; g.beginPath(); g.arc(1000,740,26,0,Math.PI*2); g.fill();
+  g.fillStyle='#fff'; g.fillRect(994,736,12,6);
+  g.fillStyle='#14202b'; g.fillRect(900,200,200,60);
+  g.fillStyle='#ffcf40'; g.font='bold 18px sans-serif'; g.textAlign='center'; g.fillText('KBO SURVIVAL', 1000, 236);
+  for(const [lx,ly] of LIGHTS){ g.fillStyle='#fff8c8'; g.beginPath(); g.arc(lx,ly,14,0,Math.PI*2); g.fill(); }
+}
+buildStadium(bgC.getContext('2d'));
+
+const darkC = document.createElement('canvas'); darkC.width=VW; darkC.height=VH;
+const dctx = darkC.getContext('2d');
+const RAIN = Array.from({length:110}, ()=>({x:Math.random()*VW, y:Math.random()*VH, s:rnd(0.6,1)}));
+
+function circ(x,y,r){ ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); }
+function limb(c,sx,sy,ang,len,col,w){
+  const ex=sx+Math.cos(ang)*len, ey=sy+Math.sin(ang)*len;
+  c.strokeStyle=col; c.lineWidth=w; c.lineCap='round';
+  c.beginPath(); c.moveTo(sx,sy); c.lineTo(ex,ey); c.stroke();
+  return [ex,ey];
+}
+// 사람 모양 스프라이트: 좌우 반전(facing)과 스케일만 적용, 상하 회전 없음
+function drawHuman(c,x,y,o){
+  const sc=o.sc||1;
+  c.save(); c.translate(x,y); c.scale((o.facing||1)*sc, sc);
+  c.globalAlpha = o.alpha==null ? 1 : o.alpha;
+  c.fillStyle='rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(0,22,12,4,0,0,Math.PI*2); c.fill();
+  const lp=o.legPhase||0, sw=o.moving ? Math.sin(lp)*4 : 0;
+  c.strokeStyle=o.pants||'#e9e9e9'; c.lineWidth=6; c.lineCap='round';
+  c.beginPath(); c.moveTo(-4,4); c.lineTo(-4+sw,17); c.moveTo(4,4); c.lineTo(4-sw,17); c.stroke();
+  c.fillStyle='#1a1a1a'; c.fillRect(-8+sw,16,8,4); c.fillRect(-sw,16,8,4);
+  const bk = limb(c,-8,-5,o.backAng,11,o.sleeve||o.uni,5);
+  if(o.glove){ c.fillStyle='#8a5a2b'; c.beginPath(); c.ellipse(bk[0],bk[1],4,5,0,0,Math.PI*2); c.fill(); }
+  c.fillStyle=o.uni; c.fillRect(-9,-8,18,15);
+  c.fillStyle='#fff'; c.font='bold 8px sans-serif'; c.textAlign='center'; c.fillText(o.num||'',0,2);
+  const fr = limb(c,8,-5,o.frontAng,12,o.sleeve||o.uni,5);
+  c.fillStyle='#f2cba3'; c.beginPath(); c.arc(fr[0],fr[1],2.6,0,Math.PI*2); c.fill();
+  if(o.ball){ c.fillStyle='#fff'; c.beginPath(); c.arc(fr[0],fr[1],3.2,0,Math.PI*2); c.fill(); }
+  if(o.prop) o.prop(c, fr[0], fr[1]);   // 손에 든 소품 (로컬 좌표, 스케일/반전 적용됨)
+  if(o.bat){
+    c.strokeStyle=o.bat.color; c.lineWidth=4; c.lineCap='round';
+    c.beginPath(); c.moveTo(fr[0],fr[1]); c.lineTo(fr[0]+Math.cos(o.bat.ang)*o.bat.len, fr[1]+Math.sin(o.bat.ang)*o.bat.len); c.stroke();
+  }
+  c.fillStyle='#f2cba3'; c.beginPath(); c.arc(0,-15,7,0,Math.PI*2); c.fill();
+  c.fillStyle=o.cap||'#111'; c.beginPath(); c.arc(0,-17,7.4,Math.PI,0); c.fill(); c.fillRect(0,-17.5,9,2.2);
+  c.fillStyle='#222'; c.fillRect(2,-14,1.5,1.5);
+  c.restore();
+}
+function drawBall(x,y,r,col,rot){
+  ctx.save(); ctx.translate(x,y);
+  const g=ctx.createRadialGradient(-r*0.3,-r*0.3,r*0.2,0,0,r);
+  g.addColorStop(0,'#ffffff'); g.addColorStop(1,col);
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#c0392b'; ctx.lineWidth=1.2;
+  ctx.rotate(rot); ctx.beginPath(); ctx.arc(-r*0.6,0,r*0.7,-1,1); ctx.stroke();
+  ctx.beginPath(); ctx.arc(r*0.6,0,r*0.7,Math.PI-1,Math.PI+1); ctx.stroke();
+  ctx.restore();
+}
+
+function drawGem(g){
+  const col = g.v>=10 ? '#ffd23f' : g.v>=3 ? '#ffb347' : '#ffe9a8';
+  const rr = g.v>=10 ? 9 : g.v>=3 ? 7 : 5;
+  ctx.globalAlpha=0.25; ctx.fillStyle=col; circ(g.x,g.y,rr*2); ctx.globalAlpha=1;
+  drawBall(g.x,g.y,rr,col,g.t*4);
+  ctx.fillStyle='rgba(255,255,255,.8)'; ctx.beginPath(); ctx.arc(g.x-rr*0.3,g.y-rr*0.35,rr*0.22,0,Math.PI*2); ctx.fill();
+}
+function drawPickup(p){
+  const x=p.x, y=p.y+Math.sin(p.t*4)*3;
+  ctx.save(); ctx.translate(x,y);
+  const gc={magnet:'#3b7bff',heal:'#4cd964',shield:'#4aa8ff',tactical:'#ffd23f',excl_bat:'#ff8a00',excl_pitch:'#fff27a'}[p.k]||'#fff';
+  const gr=ctx.createRadialGradient(0,0,2,0,0,24); gr.addColorStop(0,gc); gr.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.globalAlpha=0.5+0.3*Math.sin(p.t*6); ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+  switch(p.k){
+    case 'magnet':
+      ctx.lineWidth=5; ctx.strokeStyle='#d33'; ctx.beginPath(); ctx.arc(0,0,9,Math.PI,0); ctx.stroke();
+      ctx.strokeStyle='#3b7bff'; ctx.beginPath(); ctx.arc(0,4,9,0,Math.PI,false); ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.fillRect(-12,-3,6,4); ctx.fillRect(6,-3,6,4); break;
+    case 'heal':
+      ctx.fillStyle='#4cd964'; circ(0,0,11); ctx.fillStyle='#fff'; ctx.fillRect(-2.5,-7,5,14); ctx.fillRect(-7,-2.5,14,5); break;
+    case 'shield':
+      ctx.fillStyle='#4aa8ff'; ctx.beginPath();
+      for(let i=0;i<6;i++){ const a=i/6*Math.PI*2; const px=Math.cos(a)*11, py=Math.sin(a)*11; i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
+      ctx.closePath(); ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke(); break;
+    case 'tactical':
+      ctx.fillStyle='#f5d142'; ctx.fillRect(-9,-11,18,22); ctx.fillStyle='#8a6d00'; ctx.fillRect(-5,-14,10,4);
+      ctx.fillStyle='#444'; for(let i=0;i<3;i++) ctx.fillRect(-6,-5+i*6,12,2); break;
+    case 'excl_bat':
+      ctx.strokeStyle='#8b5a2b'; ctx.lineWidth=5; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(-10,8); ctx.lineTo(9,-9); ctx.stroke();
+      ctx.fillStyle='#ffd23f'; ctx.font='bold 9px sans-serif'; ctx.textAlign='center'; ctx.fillText('HR',0,-12); break;
+    case 'excl_pitch':
+      ctx.fillStyle='#fff27a'; ctx.beginPath(); ctx.moveTo(2,-12); ctx.lineTo(-7,2); ctx.lineTo(0,2); ctx.lineTo(-3,12); ctx.lineTo(7,-2); ctx.lineTo(0,-2); ctx.closePath(); ctx.fill(); break;
+  }
+  ctx.restore();
+}
+
+// ---- v2: 사람형 적 (타 구단 팬) ----
+// 실제 구단 로고·선수 얼굴 미사용. 가상의 응원 팬 색상만 사용.
+const ENEMY_LOOK = {
+  standard:{uni:'#2f6fd0', pants:'#dfe6ee', cap:'#ffffff'},
+  rush:    {uni:'#c62828', pants:'#f5f5f5', cap:'#ffd54f'},
+  tank:    {uni:'#6d4c41', pants:'#4e342e', cap:'#212121'},
+  ranged:  {uni:'#7b1fa2', pants:'#e0e0e0', cap:'#263238'},
+  summoner:{uni:'#f9a825', pants:'#3e2723', cap:'#1b1b1b'},
+  exploder:{uni:'#263238', pants:'#78909c', cap:'#d50000'},
+};
+let VIS_ALPHA = 1;   // 시야 밖 실루엣 처리용 (비 이벤트)
+function enemyProp(e){
+  return (c,hx,hy)=>{
+    switch(e.type){
+      case 'standard': // 응원 수건
+        c.fillStyle='#ffffff'; c.fillRect(hx-4,hy-14,8,12); c.strokeStyle='#2f6fd0'; c.lineWidth=1; c.strokeRect(hx-4,hy-14,8,12); break;
+      case 'tank': // 접이식 의자
+        c.fillStyle='#8d6e63'; c.fillRect(hx-6,hy-2,14,10); c.strokeStyle='#3e2723'; c.strokeRect(hx-6,hy-2,14,10); break;
+      case 'ranged': // 투척 소품 (릴리스 후에는 숨김)
+        if(e.released) break;
+        if(e.thrown==='chicken'){ c.fillStyle='#c97a2b'; c.beginPath(); c.ellipse(hx,hy-2,6,5,0.4,0,Math.PI*2); c.fill(); c.fillStyle='#fff'; c.fillRect(hx+3,hy-4,5,2); }
+        else { c.fillStyle='#f4c542'; c.fillRect(hx-4,hy-8,8,12); c.fillStyle='#fff'; c.fillRect(hx-4,hy-10,8,3); }
+        break;
+      case 'summoner': // 메가폰
+        c.fillStyle='#fff176'; c.beginPath(); c.moveTo(hx,hy-3); c.lineTo(hx+12,hy-9); c.lineTo(hx+12,hy+5); c.lineTo(hx,hy+2); c.closePath(); c.fill(); break;
+      case 'exploder': { // 폭죽 (심지 점멸)
+        c.fillStyle='#8d6e63'; c.fillRect(hx-1,hy-12,2,12);
+        c.fillStyle=(Math.floor(e.t*12)%2)?'#ff9800':'#ff1744'; c.beginPath(); c.arc(hx,hy-13,3,0,Math.PI*2); c.fill(); break; }
+    }
+  };
+}
+function drawEnemy(e){
+  const L=ENEMY_LOOK[e.type];
+  const hit=e.flash>0;
+  let sc = e.r/16;
+  if(e.type==='exploder' && e.nearT>0) sc*=1.2;   // 폭발 직전 부풀어 오름
+  let front, back, legSpeed=8;
+  if(e.type==='rush'){ front=-0.4+Math.sin(e.t*16)*0.9; back=0.9+Math.sin(e.t*16+3)*0.9; legSpeed=16; }
+  else if(e.type==='tank'){ front=0.3+Math.sin(e.t*4)*0.1; back=1.2; legSpeed=4; }
+  else { front=0.5+Math.sin(e.t*8)*0.3; back=1.0-Math.sin(e.t*8)*0.3; }
+  if(e.type==='ranged' && e.throwAnim>0){           // 와인드업 → 던지기
+    const p=1-e.throwAnim/0.4;
+    front = p<0.6 ? lerp(-2.6,0.1,p/0.6) : lerp(0.1,0.8,(p-0.6)/0.4);
+  }
+  if(e.type==='summoner' && e.sumAnim>0) front=-2.2;   // 메가폰 들어 올림
+  drawHuman(ctx, e.x, e.y, {
+    uni: hit?'#ffffff':L.uni, cap:L.cap, pants:L.pants, num:'',
+    facing:(RUN.px>=e.x)?1:-1, sc, legPhase:e.t*legSpeed, moving:true,
+    frontAng:front, backAng:back, alpha:VIS_ALPHA, prop:enemyProp(e)
+  });
+  if(e.hp<e.maxHp){
+    ctx.fillStyle='#000'; ctx.fillRect(e.x-e.r,e.y-e.r*2.2,e.r*2,4);
+    ctx.fillStyle='#ff5b5b'; ctx.fillRect(e.x-e.r,e.y-e.r*2.2,e.r*2*clamp(e.hp/e.maxHp,0,1),4);
+  }
+}
+function drawEnemyVis(e, vr){
+  const far = vr>0 && Math.hypot(e.x-RUN.px,e.y-RUN.py)>vr;
+  VIS_ALPHA = far ? 0.12 : 1;     // 시야 밖은 실루엣
+  drawEnemy(e);
+  VIS_ALPHA = 1;
+}
+function drawBossVis(b, vr){
+  const far = vr>0 && Math.hypot(b.x-RUN.px,b.y-RUN.py)>vr;
+  VIS_ALPHA = far ? 0.12 : 1;
+  drawBoss(b);
+  VIS_ALPHA = 1;
+}
+function bossProp(b){
+  return (c,hx,hy)=>{
+    switch(b.kind){
+      case 'cheer': // 응원 깃발 + 메가폰
+        c.fillStyle='#ffd23f'; c.fillRect(-12,-36,24,8);
+        c.fillStyle='#fff'; c.beginPath(); c.moveTo(hx,hy-4); c.lineTo(hx+16,hy-14); c.lineTo(hx+16,hy+6); c.lineTo(hx,hy+2); c.closePath(); c.fill(); break;
+      case 'charge': // 배트
+        c.strokeStyle='#8b5a2b'; c.lineWidth=4; c.lineCap='round'; c.beginPath(); c.moveTo(hx,hy); c.lineTo(hx+14,hy-14); c.stroke();
+        c.fillStyle='#1565c0'; c.beginPath(); c.arc(0,-17,8,Math.PI,0); c.fill(); break; // 헬멧
+      case 'dplay': // 글러브 (앞손)
+        c.fillStyle='#8a5a2b'; c.beginPath(); c.arc(hx,hy,5,0,Math.PI*2); c.fill(); break;
+      case 'laser': // 대포 팔
+        c.fillStyle='#90a4ae'; c.fillRect(hx-2,hy-6,12,7); c.fillStyle='#37474f'; c.fillRect(hx+8,hy-5,6,5); break;
+    }
+  };
+}
+
+// ---- v2: 투척 (맥주컵 / 치킨) ----
+function releaseLob(e){
+  const R=RUN; if(R.lobs.length>=LOB_MAX) return;   // 동시 투사체 상한
+  const dir = (R.px>=e.x)?1:-1;
+  R.lobs.push({kind:e.thrown, sx:e.x+dir*10, sy:e.y-6, tx:R.px, ty:R.py, t:0, T:0.9, H:70,
+    dmg:e.dmg*1.1, cx:e.x, cy:e.y-6, gx:e.x, gy:e.y, done:false, spin:rnd(0,6)});
+  SFX.pitch();
+}
+function updateLobs(dt){
+  const R=RUN;
+  for(const l of R.lobs){
+    if(l.done) continue;
+    l.t += dt/l.T;
+    const p=Math.min(1,l.t);
+    l.gx=lerp(l.sx,l.tx,p); l.gy=lerp(l.sy,l.ty,p);     // 착지 지점(그림자)
+    l.cx=l.gx; l.cy=l.gy-4*l.H*p*(1-p);                 // 포물선 높이
+    l.spin+=dt*12;
+    if(p>=1){ l.done=true; landLob(l); }
+  }
+  R.lobs=R.lobs.filter(l=>!l.done);
+}
+function landLob(l){
+  const R=RUN, beer=l.kind==='beer', col=beer?'#f4c542':'#c97a2b';
+  fxRing(l.gx,l.gy,col,beer?46:36,0.35);
+  fxSpark(l.gx,l.gy,col,10);
+  if(Math.hypot(R.px-l.gx,R.py-l.gy)<36){
+    hurtPlayer(l.dmg);
+    if(beer){ R.slowT=1.5; toast('맥주 명중! 젖음 1.5초 (이동 -20%)','#f4c542'); }
+  }
+}
+function drawLob(l){
+  ctx.save();
+  ctx.globalAlpha=0.35; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(l.gx,l.gy+4,8,3,0,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha=1;
+  ctx.translate(l.cx,l.cy); ctx.rotate(Math.sin(l.spin)*0.8);
+  if(l.kind==='beer'){
+    ctx.fillStyle='#f4c542'; ctx.fillRect(-6,-9,12,16);
+    ctx.fillStyle='#fffaf0'; ctx.fillRect(-6,-12,12,5);
+    ctx.strokeStyle='#b8860b'; ctx.lineWidth=1; ctx.strokeRect(-6,-9,12,16);
+  } else {
+    ctx.fillStyle='#c97a2b'; ctx.beginPath(); ctx.ellipse(0,0,8,6,0.3,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.fillRect(5,-2,6,3); ctx.beginPath(); ctx.arc(11,-2,2,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+// 시야 밖에서 날아오는 공격 → 화면 가장자리 빨간 화살표
+function drawEdgeArrows(vr){
+  const R=RUN;
+  const list=[...R.lobs.map(l=>({x:l.cx,y:l.cy})), ...R.eproj.map(p=>({x:p.x,y:p.y}))];
+  if(R.boss) for(const tg of R.boss.teles) if(tg.k==='line') list.push({x:tg.x,y:tg.y});
+  let n=0;
+  for(const h of list){
+    if(n>=12) break;
+    const dx=h.x-R.px, dy=h.y-R.py, d=Math.hypot(dx,dy);
+    if(d<vr) continue;
+    n++;
+    const a=Math.atan2(dy,dx), ux=Math.cos(a), uy=Math.sin(a);
+    const hw=VW/2-22, hh=VH/2-22;
+    const k=Math.min(Math.abs(ux)>1e-3?hw/Math.abs(ux):1e9, Math.abs(uy)>1e-3?hh/Math.abs(uy):1e9);
+    ctx.save(); ctx.translate(VW/2+ux*k, VH/2+uy*k); ctx.rotate(a);
+    ctx.fillStyle='#ff3b3b'; ctx.beginPath(); ctx.moveTo(12,0); ctx.lineTo(-8,-8); ctx.lineTo(-8,8); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ---- v2: 비 소리 / 웅덩이 ----
+let RAIN_NODE=null;
+const PUDDLES = Array.from({length:40}, ()=>({x:rnd(60,WW-60), y:rnd(60,WH-60), w:rnd(18,40)}));
+function startRain(){
+  try{
+    if(RAIN_NODE || !Settings.sound) return;
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const len=AC.sampleRate*2, buf=AC.createBuffer(1,len,AC.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*0.5;
+    const src=AC.createBufferSource(); src.buffer=buf; src.loop=true;
+    const f=AC.createBiquadFilter(); f.type='highpass'; f.frequency.value=1200;
+    const g=AC.createGain(); g.gain.value=0.08*Settings.volume;
+    src.connect(f); f.connect(g); g.connect(AC.destination); src.start();
+    RAIN_NODE={src};
+  }catch(e){}
+}
+function stopRain(){ if(!RAIN_NODE) return; try{ RAIN_NODE.src.stop(); }catch(e){} RAIN_NODE=null; }
+
+function drawBoss(b){
+  const pose={uni:b.color, cap:'#111', pants:'#dedede', num:'99', facing:1, legPhase:b.t*5, moving:true,
+    frontAng:0.9, backAng:1.2, glove: b.kind==='dplay', prop:bossProp(b),
+    sc: 2.4*Math.min(1, 0.4+0.6*Math.min(1,b.t/0.5)),          // 등장 시 0.5초 확대
+    alpha: (b.flash>0 ? 0.6 : 1)*VIS_ALPHA};
+  if(b.kind==='charge' && b.state==='dash') pose.facing = Math.cos(b.dir)>=0?1:-1;
+  else pose.facing = (RUN.px>=b.x)?1:-1;
+  drawHuman(ctx,b.x,b.y,pose);
+  ctx.font='bold 13px Pretendard, sans-serif'; ctx.textAlign='center';
+  ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillRect(b.x-130,b.y-b.r*2.2-20,260,20);
+  ctx.fillStyle='#ffd23f'; ctx.fillText(b.name,b.x,b.y-b.r*2.2-6);
+}
+
+function drawTelegraphs(){
+  const b=RUN.boss; if(!b) return;
+  for(const tg of b.teles){
+    const p=Math.min(1,tg.t/tg.delay);
+    if(tg.k==='zone'){
+      ctx.globalAlpha=0.2+0.5*p; ctx.fillStyle='#ff3b3b'; circ(tg.x,tg.y,tg.r*(0.6+0.4*p));
+      ctx.globalAlpha=1;
+    } else if(tg.k==='line'){
+      ctx.save(); ctx.globalAlpha=0.3+0.6*p; ctx.strokeStyle='#ff5050'; ctx.lineWidth=tg.triple?5:2;
+      ctx.setLineDash([8,6]); ctx.beginPath(); ctx.moveTo(tg.x,tg.y); ctx.lineTo(tg.x+Math.cos(tg.ang)*900, tg.y+Math.sin(tg.ang)*900); ctx.stroke(); ctx.restore();
+    }
+  }
+  if(b.kind==='charge' && b.state==='aim'){
+    ctx.save(); ctx.globalAlpha=0.7; ctx.strokeStyle='#ff5050'; ctx.lineWidth=3; ctx.setLineDash([10,8]);
+    ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(b.x+Math.cos(b.dir)*600,b.y+Math.sin(b.dir)*600); ctx.stroke(); ctx.restore();
+  }
+}
+
+function drawMate(m){
+  if(m.wait>0) return;
+  for(const tr of m.trail){                                              // 돌진 잔상
+    ctx.save(); ctx.globalAlpha=0.35*(1-tr.t/0.22); ctx.fillStyle=m.uni; circ(tr.x,tr.y+4,14); ctx.restore();
+  }
+  ctx.save(); ctx.globalAlpha=0.5; ctx.strokeStyle='#ffd23f'; ctx.lineWidth=2;   // 발밑 골드 링 (주인공과 구분)
+  ctx.beginPath(); ctx.arc(m.x,m.y+24,16,0,Math.PI*2); ctx.stroke(); ctx.restore();
+  const pose={uni:m.uni, cap:'#ffffff', pants:'#eeeeee', num:String(10+m.i*11),
+    facing:m.facing, legPhase:m.t*12, moving:true, frontAng:m.sw>0 ? lerp(-2.4,0.5,1-m.sw/0.25) : 0.6, backAng:1.0,
+    alpha: m.t<0.5 ? m.t/0.5 : 1};
+  drawHuman(ctx,m.x,m.y,pose);
+}
+
+function poseFor(R){
+  const o={uni:teamColor(R.player.team), cap:R.mode==='batter'?'#0f2a4a':'#1b1b1b', pants:'#e9e9e9',
+    num:String(R.player.number), facing:R.facing, legPhase:R.legPhase, moving:R.moving,
+    frontAng:Math.PI/2-0.2, backAng:Math.PI/2+0.3, glove:false};
+  if(R.mode==='batter'){
+    let bat = -0.45 + Math.sin(R.t*3)*0.04;
+    if(R.swing){
+      const p=Math.min(1,R.swing.t/R.swing.dur);
+      bat = p<0.44 ? lerp(-0.45,-2.6,p/0.44) : lerp(-2.6,0.4,(p-0.44)/0.56);
+    }
+    o.frontAng=bat+0.4; o.backAng=bat+0.9;
+    o.bat={ang:bat, len:28, color:'#8b5a2b'};
+  } else {
+    o.glove=true; o.backAng=-0.1;
+    if(R.wind){ const w=Math.min(1,R.wind.t/0.32); o.frontAng=lerp(-2.5,0.25,w); o.ball = w<0.9; }
+    else if(R.follow>0){ const f=R.follow/0.22; o.frontAng=lerp(0.25,1.5,1-f); }
+  }
+  return o;
+}
+
+function drawSwingTrail(){
+  const R=RUN; if(!R.swing) return;
+  const p=R.swing.t/R.swing.dur, range=S().range;
+  ctx.save(); ctx.lineCap='round';
+  for(let k=0;k<3;k++){                       // 3겹 궤적: 바깥쪽일수록 흐리게
+    ctx.globalAlpha=(0.6-k*0.18)*(1-p);
+    ctx.strokeStyle=R.swing.second ? (k===0?'#fff1a6':'#ffd23f') : (k===0?'#fffbe6':'#ffffff');
+    ctx.lineWidth=(14-k*4);
+    ctx.beginPath(); ctx.arc(R.px,R.py,range*(0.75+k*0.12),R.swing.dir-1.2+p*0.4,R.swing.dir+1.1); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawProj(p){
+  const col={fastball:'#ffffff',slider:'#7fd6ff',curve:'#8dff8d',changeup:'#ffe97f',splitter:'#d7a4ff'}[p.type]||'#fff';
+  ctx.globalAlpha=0.35; ctx.strokeStyle=col; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-Math.cos(p.dir)*14,p.y-Math.sin(p.dir)*14); ctx.stroke(); ctx.globalAlpha=1;
+  const r = p.type==='splitter' ? 6*(1-Math.min(0.5,p.t*0.8)) : 6;
+  if(p.dbl){ ctx.globalAlpha=0.3; ctx.strokeStyle='#9fe0ff'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-Math.cos(p.dir)*26,p.y-Math.sin(p.dir)*26); ctx.stroke(); ctx.globalAlpha=1; }
+  drawBall(p.x,p.y,r,col,p.t*18);
+}
+function drawEProj(p){
+  ctx.fillStyle=p.c; circ(p.x,p.y,p.r);
+  ctx.globalAlpha=0.3; ctx.fillStyle=p.c; circ(p.x,p.y,p.r*2); ctx.globalAlpha=1;
+}
+function drawFx(){
+  const R=RUN;
+  for(const f of R.fx){
+    const p=f.t/f.life;
+    if(f.k==='ring'){
+      ctx.save(); ctx.globalAlpha=1-p; ctx.strokeStyle=f.c; ctx.lineWidth=4*(1-p)+1;
+      ctx.beginPath(); ctx.arc(f.x,f.y,f.max*p,0,Math.PI*2); ctx.stroke(); ctx.restore();
+    } else if(f.k==='spark'){
+      ctx.globalAlpha=1-p; ctx.fillStyle=f.c; circ(f.x,f.y,3*(1-p)+1); ctx.globalAlpha=1;
+    }
+  }
+  for(const x of R.texts){
+    const a=1-(x.t/x.life);
+    ctx.save(); ctx.globalAlpha=Math.max(0,a);
+    ctx.font = x.big ? 'bold 22px Pretendard, sans-serif' : 'bold 15px Pretendard, sans-serif';
+    ctx.textAlign='center'; ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,.75)';
+    ctx.strokeText(x.text,x.x,x.y); ctx.fillStyle=x.c; ctx.fillText(x.text,x.x,x.y);
+    ctx.restore();
+  }
+}
+
+function drawDark(alpha, holes){
+  dctx.setTransform(1,0,0,1,0,0);
+  dctx.globalCompositeOperation='source-over';
+  dctx.clearRect(0,0,VW,VH);
+  dctx.fillStyle=`rgba(0,0,8,${alpha})`; dctx.fillRect(0,0,VW,VH);
+  dctx.globalCompositeOperation='destination-out';
+  for(const h of holes){
+    const inner = h.inner!=null ? h.inner : h.r*0.4;
+    const g=dctx.createRadialGradient(h.x,h.y,inner,h.x,h.y,h.r);
+    g.addColorStop(0,'rgba(0,0,0,1)'); g.addColorStop(1,'rgba(0,0,0,0)');
+    dctx.fillStyle=g; dctx.beginPath(); dctx.arc(h.x,h.y,h.r,0,Math.PI*2); dctx.fill();
+  }
+  dctx.globalCompositeOperation='source-over';
+  ctx.drawImage(darkC,0,0,VW,VH);
+}
+
+
+// ---- v3: 선수 정보 HUD, 체력/경험치 바, 착지 예측 ----
+function dataStatus(p){
+  if(!p) return {t:'선수 정보 없음 (데이터 로드 실패)', c:'#ff6b6b'};
+  if(p.fictional) return {t:'테스트 데이터 · Gameplay test setting', c:'#ffb74d'};
+  if(p.missing && p.missing.length) return {t:'실제 기록 일부 없음 · Data unavailable', c:'#ffd54f'};
+  return {t:'실제 KBO 기록 적용', c:'#7fe39a'};
+}
+function drawPlayerPanel(R){
+  const p=R.player||{}, pas=R.passive, s=S();
+  const name = p.name || '선수 정보 없음';
+  ctx.save();
+  ctx.fillStyle='rgba(8,16,24,.8)'; ctx.fillRect(10,10,330,150);
+  ctx.fillStyle=R.mode==='batter'?'#ffb74d':'#90caf9'; ctx.fillRect(10,10,4,150);
+  ctx.textAlign='left';
+  ctx.fillStyle='#ffd23f'; ctx.font='bold 19px Pretendard, sans-serif'; ctx.fillText(name,22,34);
+  ctx.fillStyle='#cfd8e3'; ctx.font='12px Pretendard, sans-serif';
+  ctx.fillText(`${p.team||'소속 미상'} · ${p.position||'포지션 미상'} · ${R.mode==='batter'?'타자 모드':'투수 모드'}`,22,52);
+  const rec = R.mode==='batter'
+    ? `AVG ${dv(p.avg,fmt3)} · HR ${dv(p.hr,v=>v)} · OPS ${dv(p.ops,fmt3)}`
+    : `ERA ${dv(p.era,v=>v.toFixed(2))} · K ${dv(p.strikeouts,v=>v)} · 최고 ${dv(p.maxVelocity,v=>v+' km/h')}`;
+  ctx.fillStyle='#ffffff'; ctx.fillText(`[실제 기록] ${rec}`,22,70);
+  const bal = R.mode==='batter'
+    ? `공격력 ${Math.round(s.dmg)} · 공격 간격 ${s.interval.toFixed(2)}s`
+    : (()=>{ const A=R.base.attrs||{}; const f=x=>x==null?'-':x; return `속도 ${f(A.velocity)} · 제구 ${f(A.control)} · K ${f(A.strikeout)} · 변화 ${f(A.breaking)}`; })();
+  ctx.fillStyle='#9fe0ff'; ctx.fillText(`[게임 수치] ${bal}`,22,88);
+  const ds=dataStatus(R.player);
+  ctx.fillStyle=ds.c; ctx.font='bold 11px Pretendard, sans-serif';
+  ctx.fillText(`● ${ds.t}${p.season?` · ${p.season} 시즌`:''}`,22,106);
+  ctx.fillStyle='#8fa3b5'; ctx.font='10px Pretendard, sans-serif';
+  ctx.fillText(`출처: ${p.source||'출처 미기재'}`,22,122);
+  ctx.fillStyle='#ffd23f'; ctx.font='bold 12px Pretendard, sans-serif';
+  ctx.fillText(`패시브 ${pas.ko}: ${pas.desc}`,22,142);
+  ctx.restore();
+}
+function drawHpBar(R){
+  const x=VW/2-210, y=VH-54, w=420, h=24;
+  if(R._hpS==null) R._hpS=R.hp;
+  R._hpS += (R.hp-R._hpS)*0.12;                      // 감소/회복을 부드럽게 표시
+  const ratio=clamp(R.hp/R.maxHp,0,1), shown=clamp(R._hpS/R.maxHp,0,1);
+  ctx.save();
+  ctx.fillStyle='rgba(8,16,24,.85)'; ctx.fillRect(x-4,y-4,w+8,h+8);
+  ctx.fillStyle='#2b0b0b'; ctx.fillRect(x,y,w,h);
+  ctx.fillStyle='#ffb3b3'; ctx.fillRect(x,y,w*shown,h);       // 잔상(줄어든 구간)
+  const low=ratio<0.3;
+  ctx.globalAlpha = low ? (0.6+0.4*Math.sin(performance.now()/120)) : 1;   // 저체력 맥동
+  ctx.fillStyle = low ? '#ff3b3b' : (ratio<0.6 ? '#ffb020' : '#3ddc84');
+  ctx.fillRect(x,y,w*ratio,h);
+  ctx.globalAlpha=1;
+  if(R.healT>0){ ctx.fillStyle=`rgba(140,255,170,${R.healT*0.55})`; ctx.fillRect(x,y,w,h); }   // 회복 연출
+  ctx.strokeStyle='#ffffff'; ctx.lineWidth=2; ctx.strokeRect(x,y,w,h);
+  ctx.fillStyle='#ffffff'; ctx.font='bold 15px Pretendard, sans-serif'; ctx.textAlign='center';
+  ctx.fillText(`HP ${Math.ceil(R.hp)} / ${R.maxHp}`, VW/2, y+17);
+  if(R.shield>0){                                      // 보호막은 별도 막대
+    ctx.fillStyle='#4aa8ff'; ctx.fillRect(x,y-10,w*clamp(R.shield/40,0,1),6);
+    ctx.textAlign='left'; ctx.font='bold 12px Pretendard, sans-serif'; ctx.fillStyle='#9fd4ff';
+    ctx.fillText(`보호막 ${Math.ceil(R.shield)}`, x+w+10, y+17);
+  }
+  ctx.restore();
+}
+function drawXpBar(R){
+  const x=10, y=VH-14, w=VW-20, h=10;
+  if(R._xpLv!==R.lv){ R._xpLv=R.lv; if(R._xpS==null || R._xpS>R.xp) R._xpS=0; }
+  if(R._xpS==null) R._xpS=R.xp;
+  R._xpS += (R.xp-R._xpS)*0.12;                       // 경험치 증가 애니메이션
+  ctx.save();
+  ctx.fillStyle='rgba(8,16,24,.85)'; ctx.fillRect(x-2,y-2,w+4,h+4);
+  ctx.fillStyle='#2a2410'; ctx.fillRect(x,y,w,h);
+  const r=clamp(R._xpS/R.xpNext,0,1);
+  const g=ctx.createLinearGradient(x,0,x+w,0); g.addColorStop(0,'#b8860b'); g.addColorStop(1,'#ffe066');
+  ctx.fillStyle=g; ctx.fillRect(x,y,w*r,h);
+  ctx.fillStyle='#ffffff'; ctx.font='bold 11px Pretendard, sans-serif'; ctx.textAlign='center';
+  ctx.fillText(`Lv.${R.lv}   EXP ${Math.floor(R.xp)} / ${R.xpNext}`, VW/2, y-4);
+  if(R.lvFlash>0){
+    ctx.globalAlpha=Math.min(1,R.lvFlash*1.5);
+    ctx.fillStyle='#ffd23f'; ctx.font='bold 28px Pretendard, sans-serif';
+    ctx.fillText('LEVEL UP!', VW/2, VH-80);
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+}
+
+// 착지 예측: 발사 순간 착지 지점을 확정하고, 피해 반경(36px)과 남은 시간을 표시
+function drawLobMarkers(){
+  const R=RUN;
+  for(const l of R.lobs){
+    if(l.done) continue;
+    const p=Math.min(1,l.t), beer=l.kind==='beer', col=beer?'#f4c542':'#e0743a', rad=36;
+    const hz=4+20*p*p;                                   // 착지가 가까울수록 빠르게 맥동
+    const pulse=0.5+0.5*Math.sin(l.t*l.T*hz*2*Math.PI); // 게임 시간 기준 → 일시정지 시 멈춤
+    ctx.save();
+    ctx.globalAlpha=0.16+0.24*p+0.1*pulse;
+    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(l.tx,l.ty,rad,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=0.6+0.4*pulse;
+    ctx.strokeStyle=col; ctx.lineWidth=3;
+    ctx.setLineDash(beer?[]:[6,4]);                     // 맥주=실선, 치킨=점선
+    ctx.beginPath(); ctx.arc(l.tx,l.ty,rad,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle='#ffffff'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(l.tx-6,l.ty); ctx.lineTo(l.tx+6,l.ty); ctx.moveTo(l.tx,l.ty-6); ctx.lineTo(l.tx,l.ty+6); ctx.stroke();
+    ctx.globalAlpha=1; ctx.textAlign='center'; ctx.font='bold 12px Pretendard, sans-serif';
+    ctx.fillStyle='rgba(0,0,0,.75)'; ctx.fillRect(l.tx-38,l.ty-rad-24,76,18);
+    ctx.fillStyle=col; ctx.fillText(`${beer?'맥주':'치킨'} ${((1-p)*l.T).toFixed(1)}s`, l.tx, l.ty-rad-11);
+    ctx.restore();
+  }
+}
+
+function drawBanner(){
+  const b=RUN.banner; if(!b) return;
+  const p=b.t/b.life;
+  const a = p<0.12 ? p/0.12 : (p>0.7 ? Math.max(0,(1-p)/0.3) : 1);
+  const sc = 1 + 0.35*Math.max(0,1-p*5);
+  ctx.save(); ctx.globalAlpha=a; ctx.translate(VW/2, VH*0.28); ctx.scale(sc,sc);
+  ctx.textAlign='center'; ctx.lineWidth=6; ctx.strokeStyle='rgba(0,0,0,.85)';
+  ctx.font='900 38px Pretendard, sans-serif'; ctx.strokeText(b.text,0,0); ctx.fillStyle='#ffd23f'; ctx.fillText(b.text,0,0);
+  ctx.font='bold 16px Pretendard, sans-serif'; ctx.lineWidth=4; ctx.strokeText(b.sub,0,28); ctx.fillStyle='#ffffff'; ctx.fillText(b.sub,0,28);
+  ctx.restore();
+}
+function drawSkillList(R){
+  const ids=Object.keys(R.sk); if(!ids.length) return;
+  ctx.save(); ctx.textAlign='right'; ctx.font='bold 12px Pretendard, sans-serif';
+  let y=66;
+  for(const id of ids.slice(-7)){
+    const d=SKILLS.find(x=>x.id===id), s=R.sk[id], rr=SK_RAR[s.rar]; if(!d) continue;
+    ctx.fillStyle='rgba(8,16,24,.72)'; ctx.fillRect(VW-236,y-13,220,18);
+    ctx.fillStyle=rr.c; ctx.fillText(`${d.i} ${d.n} Lv${s.lv}/${rr.max} · ${rr.k}`, VW-20, y); y+=20;
+  }
+  ctx.restore();
+}
+function drawHUD(cx,cy){
+  const R=RUN, s=S();
+  ctx.save();
+  // 좌상단: 선수 정보 패널 / 하단: 체력 바·경험치 바
+  drawPlayerPanel(R);
+  drawHpBar(R);
+  drawXpBar(R);
+  drawSkillList(R);
+
+  // 상단 중앙: 점수·시간·처치
+  ctx.fillStyle='rgba(8,16,24,.72)'; ctx.fillRect(VW/2-190,8,380,40);
+  ctx.textAlign='center'; ctx.fillStyle='#ffd23f'; ctx.font='bold 17px Pretendard, sans-serif';
+  ctx.fillText(`SCORE ${R.score.toLocaleString('ko-KR')}`, VW/2-60, 34);
+  ctx.fillStyle='#fff'; ctx.font='bold 14px Pretendard, sans-serif';
+  ctx.fillText(`${mmss(R.t)}   처치 ${R.kills}`, VW/2+90, 34);
+
+  // 콤보
+  if(R.combo>=2){
+    ctx.fillStyle='#ff9f43'; ctx.font='bold 16px Pretendard, sans-serif';
+    ctx.fillText(`COMBO ${R.combo}  ×${comboMul().toFixed(1)}`, VW/2, 66);
+  }
+  // 이벤트
+  if(R.ev){
+    ctx.fillStyle='rgba(8,16,24,.72)'; ctx.fillRect(VW/2-120,76,240,22);
+    ctx.fillStyle='#9fe0ff'; ctx.font='bold 12px Pretendard, sans-serif';
+    ctx.fillText(`${EVENTS[R.ev.key].name} · ${Math.ceil(R.ev.t)}초`, VW/2, 91);
+  }
+  // 보스 체력
+  if(R.boss){
+    const b=R.boss;
+    ctx.fillStyle='rgba(8,16,24,.8)'; ctx.fillRect(VW/2-260,108,520,30);
+    ctx.fillStyle='#fff'; ctx.font='bold 12px Pretendard, sans-serif'; ctx.textAlign='center';
+    ctx.fillText(b.name, VW/2, 120);
+    ctx.fillStyle='#333'; ctx.fillRect(VW/2-240,125,480,8);
+    ctx.fillStyle='#ff4d4d'; ctx.fillRect(VW/2-240,125,480*clamp(b.hp/b.maxHp,0,1),8);
+  }
+
+  // 우상단: 벤치 클리어링
+  ctx.textAlign='right'; ctx.fillStyle='rgba(8,16,24,.72)'; ctx.fillRect(VW-220,8,210,40);
+  ctx.fillStyle='#fff'; ctx.font='bold 13px Pretendard, sans-serif';
+  ctx.fillText(`벤치 클리어링 ${'●'.repeat(R.bench)}${'○'.repeat(3-R.bench)}  [B]`, VW-16, 26);
+  ctx.font='11px Pretendard, sans-serif'; ctx.fillStyle='#9fb3c4';
+  ctx.fillText(R.mates.length?`지원 중 ${R.mates[0].t.toFixed(1)}초`:'ESC 일시정지', VW-16, 42);
+
+  // 좌하단: 활성 효과
+  const buffs=[];
+  if(R.magnetT>0) buffs.push(['자석',R.magnetT]);
+  if(R.tacT>0) buffs.push(['감독 작전',R.tacT]);
+  if(R.exclT>0) buffs.push([R.mode==='batter'?'홈런 메이커 방망이':'라이트닝 패스트볼',R.exclT]);
+  if(R.shieldT>0) buffs.push(['보호막',R.shieldT]);
+  if(R.slowT>0) buffs.push(['젖음 (이동 -20%)',R.slowT]);
+  buffs.forEach((b,i)=>{
+    ctx.textAlign='left'; ctx.fillStyle='rgba(8,16,24,.72)'; ctx.fillRect(10,VH-34-i*24,220,20);
+    ctx.fillStyle='#ffd23f'; ctx.font='bold 12px Pretendard, sans-serif';
+    ctx.fillText(`${b[0]} ${b[1].toFixed(1)}초`,16,VH-19-i*24);
+  });
+
+  // 토스트
+  R.toasts.forEach((t,i)=>{
+    const a=clamp(1-(t.t-2.0)/0.6,0,1);
+    ctx.save(); ctx.globalAlpha=a; ctx.textAlign='center';
+    ctx.font='bold 15px Pretendard, sans-serif';
+    const w=ctx.measureText(t.text).width+24;
+    ctx.fillStyle='rgba(8,16,24,.8)'; ctx.fillRect(VW/2-w/2, 150+i*26, w, 22);
+    ctx.fillStyle=t.c; ctx.fillText(t.text, VW/2, 166+i*26);
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+function drawWarn(){
+  const w=RUN.warn; const flash=Math.floor(performance.now()/250)%2===0;
+  ctx.save();
+  ctx.fillStyle = flash ? 'rgba(200,20,20,0.18)' : 'rgba(200,20,20,0.08)';
+  ctx.fillRect(0,0,VW,VH);
+  ctx.textAlign='center';
+  ctx.fillStyle='#ff4d4d'; ctx.font='bold 34px Pretendard, sans-serif';
+  ctx.fillText('⚠ 보스 등장 경고!', VW/2, VH/2-20);
+  ctx.fillStyle='#fff'; ctx.font='bold 18px Pretendard, sans-serif';
+  ctx.fillText(w.name, VW/2, VH/2+14);
+  ctx.fillStyle='#ffd23f'; ctx.font='bold 14px Pretendard, sans-serif';
+  ctx.fillText(`${Math.ceil(w.t)}초 후 등장`, VW/2, VH/2+40);
+  ctx.restore();
+}
+
+function drawJoy(){
+  ctx.save(); ctx.globalAlpha=0.35; ctx.strokeStyle='#fff'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.arc(joy.bx,joy.by,50,0,Math.PI*2); ctx.stroke();
+  ctx.globalAlpha=0.55; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(joy.bx+joy.x*40, joy.by+joy.y*40, 16, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function render(){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.fillStyle='#0d1f10'; ctx.fillRect(0,0,VW,VH);
+  const R=RUN;
+  if(!R){ ctx.drawImage(bgC, WW/2-VW/2, WH/2-VH/2, VW, VH, 0,0,VW,VH); return; }
+
+  let cx=clamp(R.px-VW/2,0,WW-VW), cy=clamp(R.py-VH/2,0,WH-VH);
+  if(shake>0){ cx=clamp(cx+rnd(-shake,shake),0,WW-VW); cy=clamp(cy+rnd(-shake,shake),0,WH-VH); }
+  ctx.drawImage(bgC, cx,cy,VW,VH, 0,0,VW,VH);
+
+  ctx.save(); ctx.translate(-cx,-cy);
+  const on=(x,y,p)=>x>cx-p && x<cx+VW+p && y>cy-p && y<cy+VH+p;
+  if(evMods().rain){   // 비: 웅덩이 반사
+    ctx.fillStyle='rgba(170,210,255,0.22)';
+    for(const pd of PUDDLES) if(on(pd.x,pd.y,60)){ ctx.beginPath(); ctx.ellipse(pd.x,pd.y,pd.w,pd.w*0.4,0,0,Math.PI*2); ctx.fill(); }
+  }
+  drawTelegraphs();
+  for(const p of R.pickups) if(on(p.x,p.y,40)) drawPickup(p);
+  for(const g of R.gems) if(on(g.x,g.y,30)) drawGem(g);
+  const vr = evMods().hole || 0;   // 비 이벤트 시야 반경 (0이면 시야 제한 없음)
+  for(const e of R.enemies) if(on(e.x,e.y,60)) drawEnemyVis(e, vr);
+  if(R.boss) drawBossVis(R.boss, vr);
+  for(const l of R.lobs) drawLob(l);
+  drawLobMarkers();
+  for(const p of R.eproj) if(on(p.x,p.y,30)) drawEProj(p);
+  for(const m of R.mates) drawMate(m);
+  drawSwingTrail();
+  // 플레이어
+  if(R.shield>0){ ctx.strokeStyle='rgba(120,200,255,.8)'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(R.px,R.py,26,0,Math.PI*2); ctx.stroke(); }
+  if(R.exclT>0){ ctx.strokeStyle='rgba(255,210,60,.7)'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(R.px,R.py,30+Math.sin(R.t*8)*2,0,Math.PI*2); ctx.stroke(); }
+  drawHuman(ctx,R.px,R.py,Object.assign(poseFor(R),{alpha: R.invuln>0 && Math.floor(R.t*20)%2===0 ? 0.4 : 1}));
+  for(const p of R.proj) if(on(p.x,p.y,30)) drawProj(p);
+  drawFx();
+  ctx.restore();
+
+  // 화면 공간 효과
+  const m=evMods();
+  if(m.rain){
+    ctx.save(); ctx.strokeStyle='rgba(180,220,255,.35)'; ctx.lineWidth=1;
+    for(const d of RAIN){ const y=(d.y+R.t*400*d.s)%VH; ctx.beginPath(); ctx.moveTo(d.x,y); ctx.lineTo(d.x-3,y+10); ctx.stroke(); }
+    ctx.restore();
+  }
+  if(m.dark>0){
+    // 비: 160px 선명 구간 + 200px 그라데이션 (바깥은 alpha 0.85)
+    const holes=[{x:R.px-cx, y:R.py-cy, r: m.hole ? m.hole+200 : 150, inner: m.hole || undefined}];
+    if(m.night) for(const [lx,ly] of LIGHTS) holes.push({x:lx-cx, y:ly-cy, r:240});
+    drawDark(m.dark, holes);
+    if(m.hole){
+      drawEdgeArrows(m.hole);                       // 시야 밖 공격 방향 표시
+      ctx.save(); ctx.translate(-cx,-cy); drawTelegraphs(); drawLobMarkers(); ctx.restore();  // 보스 예고는 안개 위에도 표시
+    }
+  }
+  if(m.tint){ ctx.fillStyle=m.tint; ctx.fillRect(0,0,VW,VH); }
+  if(R.flashT>0){ ctx.fillStyle='rgba(255,255,255,'+(0.45*R.flashT/0.35).toFixed(3)+')'; ctx.fillRect(0,0,VW,VH); }
+  drawHUD(cx,cy);
+  drawBanner();
+  if(RUN.warn) drawWarn();
+  if(joy.on) drawJoy();
+}
+
+// ============================================================
+// 15. 입력
+// ============================================================
+const keys = {};
+const joy = {on:false, x:0, y:0, bx:0, by:0, id:-1};
+window.addEventListener('keydown', e=>{
+  const k=e.key.toLowerCase();
+  if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)) e.preventDefault();
+  keys[k]=true;
+  if(k==='escape'){
+    if(state==='playing') pauseGame();
+    else if(state==='paused') resumeGame();
+  }
+  if(k==='b' && state==='playing') activateBench();
+  if(state==='levelup' && ['1','2','3'].includes(k)) chooseUpgrade(parseInt(k,10)-1);
+});
+window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
+window.addEventListener('blur', ()=>{ for(const k in keys) keys[k]=false; if(state==='playing') pauseGame(); });
+
+cv.addEventListener('pointerdown', e=>{
+  if(e.pointerType!=='touch' || state!=='playing') return;
+  if(joy.id!==-1) return;
+  const r=cv.getBoundingClientRect();
+  if(e.clientX > r.left + r.width*0.5) return;
+  joy.id=e.pointerId; joy.on=true; joy.bx=(e.clientX-r.left)*(VW/r.width); joy.by=(e.clientY-r.top)*(VH/r.height); joy.x=0; joy.y=0;
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener('pointermove', e=>{
+  if(e.pointerId!==joy.id) return;
+  const r=cv.getBoundingClientRect();
+  const px=(e.clientX-r.left)*(VW/r.width), py=(e.clientY-r.top)*(VH/r.height);
+  const dx=px-joy.bx, dy=py-joy.by, d=Math.hypot(dx,dy)||1, m=Math.min(1,d/50);
+  joy.x=dx/d*m; joy.y=dy/d*m;
+});
+function joyEnd(e){ if(e.pointerId===joy.id){ joy.on=false; joy.id=-1; joy.x=0; joy.y=0; } }
+cv.addEventListener('pointerup', joyEnd);
+cv.addEventListener('pointercancel', joyEnd);
+
+// ============================================================
+// 16. 화면 / 배율 / 전체화면
+// ============================================================
+function fit(){
+  const s = Math.min(innerWidth/VW, innerHeight/VH) * Settings.zoom;
+  stage.style.width = (VW*s)+'px'; stage.style.height = (VH*s)+'px';
+}
+window.addEventListener('resize', fit);
+function zoomStep(dir){
+  const i=ZOOMS.indexOf(Settings.zoom); const ni=clamp(i+dir,0,ZOOMS.length-1);
+  Settings.zoom=ZOOMS[ni]; saveSettings(); fit(); refreshSettings();
+}
+function toggleFull(){
+  if(document.fullscreenElement) document.exitFullscreen?.();
+  else document.documentElement.requestFullscreen?.();
+}
+$('bZoomIn').onclick=()=>zoomStep(1);
+$('bZoomOut').onclick=()=>zoomStep(-1);
+$('bFull').onclick=toggleFull;
+$('bPause').onclick=()=>{ if(state==='playing') pauseGame(); else if(state==='paused') resumeGame(); };
+$('bBench').onclick=activateBench;
+fit();
+
+// ============================================================
+// 17. 화면 전환 / 메뉴
+// ============================================================
+function open(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('show', s.id===id)); }
+function closeAll(){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('show')); }
+function ctrlShow(on){ $('ctrl').classList.toggle('show', !!on); }
+
+function setMode(m){
+  MODE=m;
+  $('modeBat').className = m==='batter'?'gold':'off';
+  $('modePit').className = m==='pitcher'?'gold':'off';
+  if(SELECTED && SELECTED.mode!==m) SELECTED=null;
+  renderSelInfo();
+}
+function renderSelInfo(){
+  $('selInfo').textContent = SELECTED
+    ? `선택: ${SELECTED.name} (${SELECTED.team}) · 패시브 ${passiveFor(SELECTED).ko}`
+    : '선수: 랜덤 선택 (모드 안에서 무작위 배정)';
+}
+
+const PITCH_KO = {fastball:'직구·투심', cutter:'커터', slider:'슬라이더', curveball:'커브', changeup:'체인지업', splitter:'포크'};
+function pitchMixText(p){
+  if(!p.usage) return 'Data unavailable';
+  return Object.entries(p.usage).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${PITCH_KO[k]||k} ${Math.round(v)}%`).join(' · ');
+}
+function cardHTML(p){
+  const pas=passiveFor(p);
+  const stats = p.mode==='batter'
+    ? `AVG ${dv(p.avg,fmt3)} · HR ${dv(p.hr,v=>v)} · OPS ${dv(p.ops,fmt3)}`
+    : `평균 ${dv(p.avgVelocity,v=>v)} / 최고 ${dv(p.maxVelocity,v=>v)} km/h · ERA ${dv(p.era,v=>v.toFixed(2))} · K ${dv(p.strikeouts,v=>v)} · IP ${dv(p.innings,v=>v)}<br>주구종: ${pitchMixText(p)}`;
+  const tags = (p.fictional?'<span class="tag">가상</span>':'') + (p.missing&&p.missing.length?'<span class="tag na">Data unavailable</span>':'');
+  return `<div class="pcard ${SELECTED&&SELECTED.name===p.name?'sel':''}" data-n="${p.name}">
+    <span class="nm">${p.name}${tags}</span>
+    <div>${p.team} · ${p.position}</div>
+    <div class="muted">${stats}</div>
+    <div style="margin-top:4px"><b>${pas.ko}</b> (${pas.name})</div>
+    <div class="muted">${pas.desc} · 조건: ${pas.cond} · 관련 기록: ${pas.stat}</div>
+    </div>`;
+}
+function renderPlayerList(){
+  const q=($('search').value||'').trim().toLowerCase();
+  $('plMode').textContent = MODE==='batter'?'타자':'투수';
+  const list = PLAYERS.filter(p=>p.mode===MODE && (!q || (p.name+p.team+p.position).toLowerCase().includes(q)));
+  $('plGrid').innerHTML = list.length ? list.map(cardHTML).join('') : '<div class="muted">검색 결과가 없습니다.</div>';
+  $('plGrid').querySelectorAll('.pcard').forEach(el=>{
+    el.onclick=()=>{ SELECTED = PLAYERS.find(p=>p.name===el.dataset.n) || null; renderSelInfo(); open('menu'); };
+  });
+}
+function openPlayers(){ renderPlayerList(); open('players'); }
+
+function pickRandomPlayer(){
+  const pool = PLAYERS.filter(p=>p.mode===MODE);
+  return pool.length ? pool[Math.floor(Math.random()*pool.length)] : null;
+}
+
+// ---- 튜토리얼
+const TUT = [
+  ['1. 이동','WASD 또는 방향키로 이동합니다. 모바일은 화면 왼쪽 절반을 드래그하세요.'],
+  ['2. 자동 공격','사거리 안에 적이 들어오면 타자는 자동 스윙, 투수는 자동 투구합니다.'],
+  ['3. 적 처치','적을 쓰러뜨리면 경험치 구슬이 나오고, 연속 처치 콤보가 올라 점수 배율이 커집니다.'],
+  ['4. 경험치','구슬 근처에 가면 자동으로 흡수됩니다. 자석 아이템이 있으면 전부 끌려옵니다.'],
+  ['5. 레벨업','레벨업하면 게임이 멈추고 강화 3개 중 하나를 고릅니다. (1·2·3 키 가능)'],
+  ['6. 아이템','회복, 보호막, 감독 작전, 자석, 포지션 전용 아이템이 떨어집니다. 효과 시간이 화면에 표시됩니다.'],
+  ['7. 벤치 클리어링','B 키 또는 버튼으로 팀 동료 2명을 5초간 부릅니다. 한 판에 최대 3회.'],
+  ['8. 보스','약 75초마다 경고 후 보스가 등장합니다. 붉은 원·선은 공격 예고이니 피하세요.'],
+  ['9. 게임 오버','체력이 0이 되면 끝납니다. 점수·생존 시간·처치 수가 나오고 로컬 랭킹에 저장됩니다.'],
+  ['10. 일시정지','ESC 키 또는 ⏸ 버튼으로 멈출 수 있습니다. 멈춘 동안 모든 타이머가 정지합니다.'],
+];
+let tutIdx=0, tutDone=null;
+function openTutorial(onDone){
+  tutIdx=0; tutDone=onDone||null; renderTut(); open('tut');
+}
+function renderTut(){
+  $('tutTitle').textContent=TUT[tutIdx][0];
+  $('tutBody').textContent=TUT[tutIdx][1];
+  $('tutPg').textContent=`${tutIdx+1} / ${TUT.length}`;
+  $('tutPrev').disabled = tutIdx===0;
+  $('tutNext').textContent = tutIdx===TUT.length-1 ? '완료' : '다음';
+}
+function endTut(never){
+  if(never) Store.set('kbo_tut_done', true);
+  const cb=tutDone; tutDone=null; closeAll(); if(cb) cb();
+}
+$('tutPrev').onclick=()=>{ if(tutIdx>0){ tutIdx--; renderTut(); } };
+$('tutNext').onclick=()=>{ if(tutIdx<TUT.length-1){ tutIdx++; renderTut(); } else endTut(false); };
+$('tutSkip').onclick=()=>endTut(false);
+$('tutNever').onclick=()=>endTut(true);
+
+// ---- 시작
+function requestStart(){
+  NICK = ($('nick').value.trim()||'익명').slice(0,10);
+  Store.set('kbo_nick', NICK);
+  PICKED = (SELECTED && SELECTED.mode===MODE) ? SELECTED : pickRandomPlayer();
+  if(!PICKED){ alert('선수 데이터가 없습니다. 데이터를 확인해 주세요.'); return; }
+  if(!Store.get('kbo_tut_done', false)) openTutorial(startRun);
+  else startRun();
+}
+function startRun(){
+  closeAll();
+  RUN = newRun(PICKED);
+  state='playing';
+  ctrlShow(true);
+  toast(`${PICKED.name} 출전! (${PICKED.team})`,'#ffd23f');
+  passiveNote();
+  lastFrame = performance.now();
+}
+
+// ---- 일시정지 / 재개
+function pauseGame(){
+  if(state!=='playing') return;
+  state='paused';
+  const R=RUN;
+  $('pauseInfo').innerHTML = `${R.player.name} · 점수 ${R.score.toLocaleString('ko-KR')} · 생존 ${mmss(R.t)} · 처치 ${R.kills} · Lv.${R.lv} · 최대 콤보 ${R.maxCombo}`;
+  open('pause');
+}
+function resumeGame(){
+  if(state!=='paused') return;
+  state='playing'; closeAll();
+}
+function confirmRestart(){
+  if(!confirm('현재 진행 중인 기록이 사라지고 새로 시작합니다. 계속할까요?')) return;
+  startRun();
+}
+function confirmMenu(){
+  if(!confirm('현재 진행 중인 기록이 사라지고 메인 메뉴로 돌아갑니다. 계속할까요?')) return;
+  goMenu();
+}
+function goMenu(){
+  RUN=null; state='menu'; ctrlShow(false); closeAll(); open('menu'); renderSelInfo(); stopRain();
+}
+$('pResume').onclick=resumeGame;
+$('pRestart').onclick=confirmRestart;
+$('pMenu').onclick=confirmMenu;
+
+// ---- 레벨업
+let luChoices=[];
+function luCardHTML(c,i){
+  const R=RUN, d=c.d, rr=SK_RAR[c.rar], cc=SK_CAT[d.cat];
+  const tag = c.owned
+    ? `<span class="lvtag" style="background:#37474f">보유 Lv${c.lv}→${c.lv+1}/${rr.max}</span>`
+    : `<span class="lvtag" style="background:#2e7d32">NEW</span>`;
+  const eff = c.owned
+    ? `<div class="muted">현재: ${d.fmt(c.lv*rr.mul)}</div><div>다음: <b>${d.fmt((c.lv+1)*rr.mul)}</b></div>`
+    : `<div>효과: <b>${d.fmt(rr.mul)}</b></div>`;
+  return `<div class="lvcard" data-i="${i}" style="border:2px solid ${rr.c};text-align:left">
+    <div style="font-size:12px"><b style="color:${rr.c}">[${rr.k}]</b> <span style="color:${cc.c}">${cc.k}</span> ${tag}</div>
+    <div style="font-size:18px;margin:6px 0"><b>${d.i} ${d.n}</b></div>
+    ${eff}
+    <div class="muted" style="font-size:11px;margin-top:4px">${i+1}번 선택</div></div>`;
+}
+function openLevelUp(){
+  const R=RUN;
+  state='levelup';
+  luChoices = skillChoices();
+  if(!luChoices.length){ R.levelQ=0; state='playing'; return; }   // 선택지가 없으면 레벨업 화면 없이 계속
+  $('luTitle').textContent = `LEVEL UP! Lv.${R.lv} · 스킬 선택`;
+  $('luCards').innerHTML = luChoices.length
+    ? luChoices.map((c,i)=>luCardHTML(c,i)).join('')
+    : '<div class="muted">선택 가능한 스킬이 없습니다 (모두 최대 레벨)</div>';
+  $('luCards').querySelectorAll('.lvcard').forEach(el=>{ el.onclick=()=>chooseUpgrade(parseInt(el.dataset.i,10)); });
+  open('levelup');
+}
+function chooseUpgrade(i){
+  if(state!=='levelup') return;
+  const R=RUN;
+  if(!luChoices[i]) return;                       // 잘못된 번호 입력은 무시
+  const c=luChoices[i], id=c.d.id;
+  const cur=R.sk[id] || {lv:0, rar:c.rar};
+  R.sk[id] = {lv:cur.lv+1, rar:cur.rar};
+  if(c.d.onLevel) c.d.onLevel(R, SK_RAR[cur.rar].mul);
+  toast(`스킬 ${cur.lv?'강화':'획득'}: ${c.d.i} ${c.d.n} Lv${R.sk[id].lv} [${SK_RAR[cur.rar].k}]`, SK_RAR[cur.rar].c);
+  R.levelQ--;
+  if(R.levelQ>0){ openLevelUp(); }
+  else { state='playing'; closeAll(); }
+}
+
+// ---- 게임 오버 / 랭킹
+function endRun(){
+  if(state==='over') return;
+  state='over'; ctrlShow(false); SFX.over(); stopRain();
+  const R=RUN;
+  const rec={nick:R.nick, score:R.score, time:Math.floor(R.t), player:R.player.name,
+    mode: R.mode==='batter'?'타자':'투수', kills:R.kills, lv:R.lv, maxCombo:R.maxCombo,
+    date:new Date().toLocaleDateString('ko-KR')};
+  const lb = Store.get('kbo_lb', []);
+  lb.push(rec); lb.sort((a,b)=>b.score-a.score); Store.set('kbo_lb', lb.slice(0,20));
+  const best = Store.get('kbo_best', {score:0,time:0});
+  Store.set('kbo_best', {score:Math.max(best.score,R.score), time:Math.max(best.time,Math.floor(R.t))});
+  $('overInfo').innerHTML = `<b>${R.nick}</b> · ${R.player.name} (${R.mode==='batter'?'타자':'투수'} 모드)<br>
+    점수 <b>${R.score.toLocaleString('ko-KR')}</b> · 생존 ${mmss(R.t)} · 처치 ${R.kills} · Lv.${R.lv} · 최대 콤보 ${R.maxCombo}<br>
+    <span class="muted">로컬 랭킹(이 기기에만 저장)에 기록되었습니다.</span>`;
+  open('over');
+}
+function renderLb(){
+  const lb = Store.get('kbo_lb', []);
+  $('lbBody').innerHTML = lb.length ? `<table><tr><th>#</th><th>닉네임</th><th>점수</th><th>생존</th><th>선수</th><th>모드</th><th>처치</th></tr>` +
+    lb.map((r,i)=>`<tr><td>${i+1}</td><td>${r.nick}</td><td>${r.score.toLocaleString('ko-KR')}</td><td>${mmss(r.time)}</td><td>${r.player}</td><td>${r.mode}</td><td>${r.kills}</td></tr>`).join('') + '</table>'
+    : '<div class="muted">아직 기록이 없습니다.</div>';
+}
+$('oRestart').onclick=()=>startRun();
+$('oLb').onclick=()=>{ renderLb(); open('lb'); };
+$('oMenu').onclick=goMenu;
+
+// ---- 설정
+function refreshSettings(){
+  $('setSound').textContent = Settings.sound ? '켜짐' : '꺼짐';
+  $('setSound').className = Settings.sound ? '' : 'off';
+  $('setVol').value = Settings.volume;
+  $('setDmg').textContent = Settings.dmgNum ? '켜짐' : '꺼짐';
+  $('setDmg').className = Settings.dmgNum ? '' : 'off';
+  $('setZoomLbl').textContent = Math.round(Settings.zoom*100)+'%';
+}
+$('setSound').onclick=()=>{ Settings.sound=!Settings.sound; saveSettings(); refreshSettings(); };
+$('setVol').oninput=e=>{ Settings.volume=parseFloat(e.target.value); saveSettings(); };
+$('setDmg').onclick=()=>{ Settings.dmgNum=!Settings.dmgNum; saveSettings(); refreshSettings(); };
+$('setFull').onclick=toggleFull;
+$('setTut').onclick=()=>openTutorial(()=>open('settings'));
+$('setClear').onclick=()=>{
+  if(!confirm('로컬 랭킹·최고 기록·업적을 모두 지울까요? 되돌릴 수 없습니다.')) return;
+  Store.set('kbo_lb',[]); Store.set('kbo_best',{score:0,time:0}); Store.set('kbo_ach',{});
+  alert('초기화했습니다.');
+};
+$('setClose').onclick=()=>open('menu');
+
+// ---- 데이터 가져오기
+function parseCSV(t){
+  const lines=t.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2) throw new Error('CSV는 헤더와 최소 한 줄이 필요합니다');
+  const head=lines[0].split(',').map(s=>s.trim());
+  return lines.slice(1).map(l=>{
+    const cells=l.split(',').map(s=>s.trim()); const o={};
+    head.forEach((h,i)=>{
+      const v=cells[i]; if(v===undefined || v==='') return;
+      o[h] = (['name','team','position','mode','source'].includes(h)) ? v : (isNaN(Number(v)) ? v : Number(v));
+    });
+    if(o.fictional!==undefined) o.fictional = (o.fictional===true || o.fictional==='true');
+    return o;
+  });
+}
+$('impFile').onchange=e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader(); r.onload=()=>{ $('impText').value=String(r.result||''); }; r.readAsText(f);
+};
+$('impApply').onclick=()=>{
+  const txtv=$('impText').value.trim();
+  let arr;
+  try{
+    arr = (txtv.startsWith('[')||txtv.startsWith('{')) ? JSON.parse(txtv) : parseCSV(txtv);
+  }catch(e){ $('impResult').textContent='파싱 실패: '+e.message; return; }
+  if(!Array.isArray(arr)) arr=[arr];
+  const ok=[], errs=[], warns=[];
+  for(const raw of arr){
+    const r=normalize(raw);
+    if(r.ok){ ok.push(raw); if(r.warn) warns.push(r.warn); }
+    else errs.push(r.err);
+  }
+  Store.set('kbo_custom_players', ok);
+  loadPlayers();
+  $('impResult').textContent = `성공 ${ok.length}명 · 실패 ${errs.length}건\n` +
+    (errs.length? '실패:\n- '+errs.join('\n- ')+'\n' : '') +
+    (warns.length? '경고:\n- '+warns.join('\n- ') : '') +
+    `\n현재 선수 총 ${PLAYERS.length}명 (가상 테스트 ${TEST_PLAYERS.length}명 포함)`;
+  renderSelInfo();
+};
+$('impReset').onclick=()=>{
+  if(!confirm('가져온 데이터를 모두 삭제하고 테스트 데이터만 사용할까요?')) return;
+  Store.set('kbo_custom_players',[]); loadPlayers(); $('impResult').textContent='가져온 데이터를 삭제했습니다.';
+};
+$('impClose').onclick=()=>open('menu');
+
+// ---- 메뉴 버튼
+$('modeBat').onclick=()=>setMode('batter');
+$('modePit').onclick=()=>setMode('pitcher');
+$('btnStart').onclick=requestStart;
+$('btnRandom').onclick=()=>{ SELECTED=null; renderSelInfo(); notice('랜덤 선택: 시작 시 모드 안에서 무작위 배정됩니다'); };
+$('btnList').onclick=openPlayers;
+$('btnLb').onclick=()=>{ renderLb(); open('lb'); };
+$('btnHelp').onclick=()=>open('help');
+$('btnSettings').onclick=()=>{ refreshSettings(); open('settings'); };
+$('btnImport').onclick=()=>open('imp');
+$('search').oninput=renderPlayerList;
+$('pickRandom').onclick=()=>{ SELECTED=null; renderSelInfo(); open('menu'); };
+$('plClose').onclick=()=>open('menu');
+$('lbClose').onclick=()=>open('menu');
+$('helpClose').onclick=()=>open('menu');
+
+// 저장된 닉네임 복원
+$('nick').value = Store.get('kbo_nick','');
+setMode('batter');
+
+// ============================================================
+// 18. 메인 루프 (단일 rAF 루프, dt 기반, 일시정지 시 update 중단)
+// ============================================================
+let lastFrame = performance.now();
+let loopStarted = false;
+function frame(now){
+  try{
+    const dt = Math.min(0.05, (now-lastFrame)/1000);
+    lastFrame = now;
+    if(state==='playing' && RUN) update(dt);
+    render();
+  }catch(err){ showFatal(err); return; }   // 오류 시 루프 중단 (무한 오류 반복 방지)
+  requestAnimationFrame(frame);
+}
+if(!loopStarted){ loopStarted=true; requestAnimationFrame(frame); $('btnStart').disabled=false; }
+$('fatalRetry').onclick=()=>location.reload();   // 다시 시도 = 초기화 전체 재실행 (루프 중복 없음)
+</script>
+</body>
+</html>
